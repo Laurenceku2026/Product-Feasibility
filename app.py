@@ -25,9 +25,27 @@ with st.sidebar:
     - DFSS/六西格玛方法论
     """)
     st.markdown("---")
-    st.markdown("**分析人：Laurence Ku (古念松)**")
-    st.markdown("曾任欧司朗、雷士、Bissell研发总监")
-    st.markdown("照明学会半导体照明专委会副主任")
+    
+    # 分析人可输入（默认为空）
+    analyst_name = st.text_input(
+        "分析人姓名",
+        value="",
+        placeholder="请输入您的姓名或分析师姓名",
+        help="请填写分析人姓名"
+    )
+    analyst_title = st.text_input(
+        "分析人头衔（可选）",
+        placeholder="例如：研发总监、技术顾问",
+        help="可填写职位或公司信息"
+    )
+    
+    # 显示用户填写的分析人信息（仅当有输入时）
+    if analyst_name:
+        st.markdown(f"**分析人：{analyst_name}**")
+        if analyst_title:
+            st.markdown(f"_{analyst_title}_")
+    else:
+        st.caption("请填写分析人姓名")
 
 # 主界面 - 输入表单
 st.markdown("### 📝 产品信息输入")
@@ -149,12 +167,16 @@ if submitted:
         您的需求我们已经收到，请直接联系我获取专业的可行性分析报告。
         """)
         
-        st.info("""
+        # 联系方式（可加上分析人信息）
+        contact_info = """
         📧 **联系方式**：
         - 联系人：古生
         - 邮箱：nc.ku@hotmail.com
         - 电话：+86-13823760640
-        """)
+        """
+        if analyst_name:
+            contact_info += f"\n- 分析人：{analyst_name}" + (f" ({analyst_title})" if analyst_title else "")
+        st.info(contact_info)
         
         # 可选：显示用户输入摘要（方便用户自己核对，也可不显示）
         with st.expander("📋 您刚才输入的信息（点击展开）"):
@@ -171,6 +193,7 @@ if submitted:
             | 开发阶段 | {dev_stage} |
             | 预估预算 | {estimated_budget} |
             | 销售目标 | {sales_target or '未填写'} |
+            | 分析人 | {analyst_name or '未填写'} {('(' + analyst_title + ')') if analyst_title else ''} |
             """)
         
         # 生成一个唯一请求编号（供用户跟踪）
@@ -180,8 +203,6 @@ if submitted:
         # 添加返回顶部的按钮（可选，让用户可以重新填写）
         if st.button("← 返回重新填写"):
             st.rerun()
-        
-        # 停止继续显示原页面内容（实际上代码已执行完，不会显示后面的页脚？页脚还是会显示，但影响不大）
 else:
     # 未提交时显示页脚
     st.markdown("---")
