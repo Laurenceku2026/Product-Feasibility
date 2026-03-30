@@ -58,7 +58,7 @@ TEXTS = {
         📧 **联系方式**：
         - 联系人：古生
         - 邮箱：nc.ku@hotmail.com
-        - 电话：+86-13823760640
+        - 电话/微信：+86-13823760640
         """,
         "input_summary": "📋 您刚才输入的信息（点击展开）",
         "request_id": "您的请求编号：{}（联系时可提供此编号）",
@@ -111,9 +111,9 @@ TEXTS = {
         "manual_message": "### The analysis tool is still being connected to the AI model. Manual input is currently required.\n\nYour request has been received. Please contact me directly for a professional feasibility analysis report.",
         "contact_info": """
         📧 **Contact**:
-        - Contact: Mr. Gu
+        - Contact: Laurence Ku
         - Email: nc.ku@hotmail.com
-        - Phone: +86-13823760640
+        - Phone/Wechat: +86-13823760640
         """,
         "input_summary": "📋 Information you just entered (click to expand)",
         "request_id": "Your request ID: {} (please provide this ID when contacting)",
