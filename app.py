@@ -43,19 +43,16 @@ if "ai_base_url" not in st.session_state:
 def add_security_css():
     st.markdown("""
     <style>
-        /* 禁止选中文本 */
         body, .stApp, .markdown-text-container, .report-container {
             user-select: none;
             -webkit-user-select: none;
             -moz-user-select: none;
             -ms-user-select: none;
         }
-        /* 禁用右键菜单 */
         body {
             -webkit-touch-callout: none;
             pointer-events: auto;
         }
-        /* 背景水印（重复文字，增加截图难度） */
         .bg-watermark {
             position: fixed;
             top: 0;
@@ -75,12 +72,10 @@ def add_security_css():
     </style>
     <div class="bg-watermark"></div>
     <script>
-        // 禁用右键
         document.addEventListener('contextmenu', function(e) {
             e.preventDefault();
             return false;
         });
-        // 禁用常见截图快捷键
         document.addEventListener('keydown', function(e) {
             if (e.ctrlKey && (e.key === 'c' || e.key === 'C' || e.key === 'v' || e.key === 'V' || e.key === 'x' || e.key === 'X' || e.key === 's' || e.key === 'S')) {
                 e.preventDefault();
@@ -92,7 +87,6 @@ def add_security_css():
                 return false;
             }
         });
-        // 检测 PrintScreen 按键
         document.addEventListener('keyup', function(e) {
             if (e.key === 'PrintScreen') {
                 alert('截图行为已被记录，请勿传播保密内容。');
@@ -101,7 +95,6 @@ def add_security_css():
     </script>
     """, unsafe_allow_html=True)
 
-# 动态水印（根据语言显示不同文字）
 def add_dynamic_watermark(lang):
     if lang == "zh":
         watermark_text = "机密，样板报告，请联系 nc.ku@hotmail.com"
@@ -530,10 +523,8 @@ st.markdown("---")
 
 # ================== 侧边栏 ==================
 with st.sidebar:
-    # Report Key 放在最顶部
     report_key_input = st.text_input(t["report_key_label"], type="password", help=t["report_key_help"])
     st.markdown("---")
-    # 联系人信息
     st.markdown(t["contact_info"])
     st.markdown("---")
     
@@ -640,7 +631,7 @@ if submitted:
             except Exception as e:
                 st.error(f"{t['error_prefix']}{e}")
 
-# ================== 显示报告（添加动态水印） ==================
+# ================== 显示报告（改进：提示另一种语言的报告是否存在） ==================
 current_report = None
 if lang == "zh":
     current_report = st.session_state.report_content_zh
@@ -649,7 +640,7 @@ else:
 
 if current_report:
     add_security_css()
-    add_dynamic_watermark(lang)   # 添加右下角水印
+    add_dynamic_watermark(lang)
     st.markdown(f"## {t['report_title']}")
     st.markdown(f'<div class="report-container">{current_report}</div>', unsafe_allow_html=True)
     
@@ -687,5 +678,12 @@ if current_report:
             st.session_state.report_content_en = None
         st.rerun()
 else:
+    # 当前语言没有报告，检查另一种语言是否有报告
+    other_lang = "en" if lang == "zh" else "zh"
+    other_report = st.session_state.report_content_en if other_lang == "en" else st.session_state.report_content_zh
+    if other_report:
+        st.info(f"⚠️ 当前{ '中文' if lang == 'zh' else 'English' }报告尚未生成。您已有{ '中文' if other_lang == 'zh' else 'English' }报告，可切换语言查看。")
+    else:
+        st.info("💡 请填写产品信息并点击「开始分析」生成报告。")
     st.markdown("---")
     st.caption(t["footer"])
