@@ -375,12 +375,15 @@ if submitted:
                 )
                 
                 # 使用 deepseek-chat 模型，如果是其他引擎请修改 model 名称
-                response = openai.ChatCompletion.create(
-                    model="deepseek-chat",
-                    messages=[{"role": "user", "content": prompt}],
-                    stream=False,
-                    temperature=0.7,
-                )
+                client = openai.OpenAI(
+    api_key=st.session_state.ai_api_key,
+    base_url=st.session_state.ai_base_url,
+)
+response = client.chat.completions.create(
+    model="deepseek-chat",
+    messages=[{"role": "user", "content": prompt}],
+    temperature=0.7,
+)
                 report_content = response.choices[0].message.content
                 st.session_state.report_content = report_content
                 st.rerun()
