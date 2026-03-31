@@ -276,9 +276,7 @@ def markdown_to_docx(md_text, doc):
                 if num_cols > 0:
                     table = doc.add_table(rows=1+len(data_lines), cols=num_cols)
                     table.style = 'Table Grid'
-                    # 关键：启用自动调整列宽（根据内容）
                     table.autofit = True
-                    # 设置表格宽度为页面宽度（可选，让表格更美观）
                     table.width = Inches(6.5)
                     for row in table.rows:
                         for cell in row.cells:
@@ -372,7 +370,6 @@ with col4:
         else:
             admin_login_dialog()
             # ================== 语言文本（删除了 ** 的 prompt） ==================
-# 注意：此处 TEXTS 字典内容完整，请直接使用
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -886,18 +883,19 @@ if submitted:
                         temperature=0.7,
                     )
                     report_content = response.choices[0].message.content
-# 获取当前日期
-if lang == "zh":
-    current_date = datetime.now().strftime("%Y年%m月%d日")
-else:
-    current_date = datetime.now().strftime("%B %d, %Y")
-
-# 替换报告中的日期占位符
-report_content = report_content.replace("自动生成", current_date)
-
-                   
+                    
+                    # 获取当前日期
+                    if lang == "zh":
+                        current_date = datetime.now().strftime("%Y年%m月%d日")
+                    else:
+                        current_date = datetime.now().strftime("%B %d, %Y")
+                    
+                    # 替换报告中的日期占位符
+                    report_content = report_content.replace("自动生成", current_date)
+                    
                     # 移除所有星号（避免出现 ** 等）
                     report_content = re.sub(r'\*+', '', report_content)
+                    
                     if lang == "zh":
                         st.session_state.report_content_zh = report_content
                     else:
