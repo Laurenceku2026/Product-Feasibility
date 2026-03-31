@@ -3,6 +3,8 @@ import openai
 import json
 import os
 import re
+import secrets
+import string
 from io import BytesIO
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
@@ -41,14 +43,6 @@ LICENSE_TYPES = {
     "level4": {"name": "四级用户", "max_uses": 1000, "max_months": 60, "en_name": "Level 4"},
 }
 
-REPORT_KEYS = {
-    "Trial2026": "trial",
-    "Gold100": "level1",
-    "Silver300": "level2",
-    "Platinum500": "level3",
-    "Diamond1000": "level4",
-}
-
 USAGE_FILE = "usage_data.json"
 
 def load_usage_data():
@@ -85,26 +79,12 @@ if "current_license_type" not in st.session_state:
     st.session_state.current_license_type = None
 
 def activate_license(report_key):
-    if report_key in REPORT_KEYS:
-        lic_type = REPORT_KEYS[report_key]
-        lic_info = LICENSE_TYPES[lic_type]
-        max_uses = lic_info["max_uses"]
-        max_months = lic_info["max_months"]
-        expiry = datetime.now() + timedelta(days=max_months*30)
-        expiry_str = expiry.isoformat()
-        if report_key in st.session_state.usage_db:
-            record = st.session_state.usage_db[report_key]
-            remaining = record.get("remaining", max_uses)
-            expiry_str = record.get("expiry", expiry_str)
-        else:
-            remaining = max_uses
-            st.session_state.usage_db[report_key] = {
-                "type": lic_type,
-                "remaining": remaining,
-                "expiry": expiry_str,
-                "total_uses": 0
-            }
-            save_usage_data(st.session_state.usage_db)
+    """激活或加载授权信息，不修改剩余次数"""
+    if report_key in st.session_state.usage_db:
+        record = st.session_state.usage_db[report_key]
+        remaining = record["remaining"]
+        expiry_str = record["expiry"]
+        lic_type = record.get("type", "unknown")
         st.session_state.current_license_type = lic_type
         return True, remaining, expiry_str, lic_type
     else:
@@ -114,12 +94,8 @@ def activate_license(report_key):
 def consume_usage(report_key):
     if st.session_state.admin_logged_in:
         return True
-    if not report_key or report_key not in REPORT_KEYS:
+    if not report_key or report_key not in st.session_state.usage_db:
         return False
-    if report_key not in st.session_state.usage_db:
-        success, _, _, _ = activate_license(report_key)
-        if not success:
-            return False
     record = st.session_state.usage_db[report_key]
     remaining = record["remaining"]
     expiry_str = record["expiry"]
@@ -134,10 +110,8 @@ def consume_usage(report_key):
 def get_remaining_info(report_key):
     if st.session_state.admin_logged_in:
         return "无限", "永久"
-    if not report_key or report_key not in REPORT_KEYS:
+    if not report_key or report_key not in st.session_state.usage_db:
         return "未授权", "无"
-    if report_key not in st.session_state.usage_db:
-        return "未激活", "无"
     record = st.session_state.usage_db[report_key]
     remaining = record["remaining"]
     expiry = datetime.fromisoformat(record["expiry"])
@@ -147,9 +121,36 @@ def get_remaining_info(report_key):
 def is_premium_user(report_key):
     if st.session_state.admin_logged_in:
         return True
-    if report_key and report_key in REPORT_KEYS:
+    if report_key and report_key in st.session_state.usage_db:
         return True
     return False
+
+def generate_report_key(license_type, custom_uses=None, custom_months=None):
+    """生成随机 Report Key，并写入 usage_db"""
+    # 生成随机字符串（8位）
+    random_str = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+    new_key = f"{license_type.upper()}_{random_str}"
+    # 确定次数和有效期
+    if license_type == "custom":
+        max_uses = custom_uses
+        max_months = custom_months
+        type_name = "自定义"
+    else:
+        lic_info = LICENSE_TYPES[license_type]
+        max_uses = lic_info["max_uses"]
+        max_months = lic_info["max_months"]
+        type_name = lic_info["name"]
+    expiry = datetime.now() + timedelta(days=max_months*30)
+    expiry_str = expiry.isoformat()
+    st.session_state.usage_db[new_key] = {
+        "type": license_type,
+        "remaining": max_uses,
+        "expiry": expiry_str,
+        "total_uses": 0,
+        "generated_at": datetime.now().isoformat()
+    }
+    save_usage_data(st.session_state.usage_db)
+    return new_key, max_uses, expiry_str, type_name
 
 # ================== 防复制/截屏 CSS + 动态水印 ==================
 def add_security_css(disable=False):
@@ -329,24 +330,41 @@ def admin_settings_dialog():
         st.success("当前会话已使用新配置（刷新页面后恢复为永久配置）")
         st.rerun()
     st.markdown("---")
-    st.subheader("授权管理")
-    st.write("当前已激活的 Report Key 及其剩余次数：")
+    
+    st.subheader("Report Key 生成器")
+    key_type = st.selectbox("选择授权类型", ["试用版", "一级用户", "二级用户", "三级用户", "四级用户", "自定义"])
+    custom_uses = None
+    custom_months = None
+    if key_type == "自定义":
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            custom_uses = st.number_input("使用次数", min_value=1, step=1, value=100)
+        with col_c2:
+            custom_months = st.number_input("有效期（月）", min_value=1, step=1, value=12)
+    if st.button("生成 Report Key"):
+        if key_type == "试用版":
+            license_type = "trial"
+        elif key_type == "一级用户":
+            license_type = "level1"
+        elif key_type == "二级用户":
+            license_type = "level2"
+        elif key_type == "三级用户":
+            license_type = "level3"
+        elif key_type == "四级用户":
+            license_type = "level4"
+        else:
+            license_type = "custom"
+        new_key, max_uses, expiry_str, type_name = generate_report_key(license_type, custom_uses, custom_months)
+        st.success(f"已生成 {type_name} Report Key：")
+        st.code(new_key, language="text")
+        st.write(f"可使用次数：{max_uses} 次，有效期至：{expiry_str[:10]}")
+    
+    st.markdown("---")
+    st.subheader("已生成的所有 Report Key")
     for key, data in st.session_state.usage_db.items():
-        st.write(f"- {key}: {data['remaining']} 次剩余, 有效期至 {data['expiry'][:10]}")
-    new_key = st.text_input("手动添加/修改 Report Key", placeholder="例如 Trial2026")
-    new_remaining = st.number_input("剩余次数", min_value=0, step=1)
-    new_expiry = st.date_input("有效期至")
-    if st.button("添加/更新"):
-        if new_key:
-            st.session_state.usage_db[new_key] = {
-                "type": "manual",
-                "remaining": new_remaining,
-                "expiry": new_expiry.isoformat(),
-                "total_uses": 0
-            }
-            save_usage_data(st.session_state.usage_db)
-            st.success("已更新")
-            st.rerun()
+        expiry = datetime.fromisoformat(data["expiry"]).strftime("%Y-%m-%d")
+        st.write(f"- {key}: {data['remaining']} 次剩余, 有效期至 {expiry}")
+    
     st.markdown("---")
     st.subheader("永久修改 API Key")
     st.markdown("请前往 [Streamlit Cloud Secrets](https://share.streamlit.io/) 修改 `AI_API_KEY` 和 `AI_BASE_URL`，然后重启应用。")
@@ -770,7 +788,7 @@ with st.sidebar:
     if st.session_state.admin_logged_in:
         st.info("管理员模式：无限使用")
     else:
-        if report_key_input and report_key_input in REPORT_KEYS:
+        if report_key_input and report_key_input in st.session_state.usage_db:
             remaining_str, expiry_str = get_remaining_info(report_key_input)
             st.markdown(f"**{t['license_info']}**")
             st.write(f"{t['remaining_label']}: {remaining_str}")
@@ -855,7 +873,7 @@ if submitted:
         can_generate = True
         if st.session_state.admin_logged_in:
             can_generate = True
-        elif report_key_input and report_key_input in REPORT_KEYS:
+        elif report_key_input and report_key_input in st.session_state.usage_db:
             if not consume_usage(report_key_input):
                 st.error(t["trial_ended"])
                 can_generate = False
