@@ -2,8 +2,11 @@ import streamlit as st
 import openai
 import json
 import os
+import re
 from io import BytesIO
 from docx import Document
+from docx.shared import Pt, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from datetime import datetime, timedelta
 
 # ================== 页面配置 ==================
@@ -36,7 +39,6 @@ LICENSE_TYPES = {
     "level4": {"name": "四级用户", "max_uses": 1000, "max_months": 60, "en_name": "Level 4"},
 }
 
-# 预定义的 Report Key 及其对应的授权类型
 REPORT_KEYS = {
     "Trial2026": "trial",
     "Gold100": "level1",
@@ -45,7 +47,6 @@ REPORT_KEYS = {
     "Diamond1000": "level4",
 }
 
-# ================== 持久化存储文件路径 ==================
 USAGE_FILE = "usage_data.json"
 
 def load_usage_data():
@@ -74,19 +75,11 @@ if "ai_api_key" not in st.session_state:
     st.session_state.ai_api_key = PERSISTENT_API_KEY
 if "ai_base_url" not in st.session_state:
     st.session_state.ai_base_url = PERSISTENT_BASE_URL
-if "active_license" not in st.session_state:
-    st.session_state.active_license = None
-if "license_remaining" not in st.session_state:
-    st.session_state.license_remaining = 0
-if "license_expiry" not in st.session_state:
-    st.session_state.license_expiry = None
-if "watermark_hidden" not in st.session_state:
-    st.session_state.watermark_hidden = False
-
 if "usage_db" not in st.session_state:
     st.session_state.usage_db = load_usage_data()
+if "current_license_type" not in st.session_state:
+    st.session_state.current_license_type = None  # 'trial', 'level1', etc.
 
-# ================== 辅助函数 ==================
 def activate_license(report_key):
     if report_key in REPORT_KEYS:
         lic_type = REPORT_KEYS[report_key]
@@ -108,8 +101,10 @@ def activate_license(report_key):
                 "total_uses": 0
             }
             save_usage_data(st.session_state.usage_db)
+        st.session_state.current_license_type = lic_type
         return True, remaining, expiry_str, lic_type
     else:
+        st.session_state.current_license_type = None
         return False, 0, None, None
 
 def consume_usage(report_key):
@@ -145,8 +140,20 @@ def get_remaining_info(report_key):
     expiry_str = expiry.strftime("%Y-%m-%d")
     return str(remaining), expiry_str
 
-# ================== 防复制/截屏 CSS + 动态水印 ==================
-def add_security_css():
+def is_premium_user(report_key):
+    """判断是否为高级用户（非试用版）"""
+    if st.session_state.admin_logged_in:
+        return True
+    if report_key in REPORT_KEYS:
+        lic_type = REPORT_KEYS[report_key]
+        return lic_type != "trial"
+    return False
+
+# ================== 防复制/截屏 CSS + 动态水印（条件加载） ==================
+def add_security_css(disable=False):
+    if disable:
+        # 不添加任何限制，用户可自由复制
+        return
     st.markdown("""
     <style>
         body, .stApp, .markdown-text-container, .report-container {
@@ -214,6 +221,77 @@ def add_dynamic_watermark(lang, hide):
     </div>
     """, unsafe_allow_html=True)
 
+# ================== 将 Markdown 表格转换为 Word 表格 ==================
+def markdown_to_docx(md_text, doc):
+    """解析 Markdown 文本并写入 Word 文档（支持标题、段落、表格）"""
+    lines = md_text.split('\n')
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        # 标题
+        if line.startswith('# '):
+            doc.add_heading(line[2:], level=1)
+            i += 1
+            continue
+        if line.startswith('## '):
+            doc.add_heading(line[3:], level=2)
+            i += 1
+            continue
+        if line.startswith('### '):
+            doc.add_heading(line[4:], level=3)
+            i += 1
+            continue
+        # 表格：以 | 开头，且下一行也是以 | 开头或包含 |- 分隔符
+        if line.startswith('|') and i+1 < len(lines):
+            # 收集表格行
+            table_lines = []
+            while i < len(lines) and lines[i].startswith('|'):
+                table_lines.append(lines[i].strip())
+                i += 1
+            # 解析表格
+            if len(table_lines) >= 2:
+                # 分离表头、分隔行、数据行
+                header_line = table_lines[0]
+                sep_line = table_lines[1] if len(table_lines) > 1 else None
+                data_lines = table_lines[2:] if len(table_lines) > 2 else []
+                # 简单解析：按 | 分割，去除首尾空
+                def parse_row(row):
+                    cells = [cell.strip() for cell in row.split('|')]
+                    # 去除首尾空元素
+                    if cells and cells[0] == '':
+                        cells = cells[1:]
+                    if cells and cells[-1] == '':
+                        cells = cells[:-1]
+                    return cells
+                headers = parse_row(header_line)
+                # 跳过分隔行（包含 --- 的行）
+                if sep_line and '---' in sep_line:
+                    pass
+                # 创建 Word 表格
+                num_cols = len(headers)
+                if num_cols > 0:
+                    table = doc.add_table(rows=1+len(data_lines), cols=num_cols)
+                    table.style = 'Light Grid Accent 1'
+                    # 填充表头
+                    for col_idx, cell_text in enumerate(headers):
+                        table.cell(0, col_idx).text = cell_text
+                        # 加粗
+                        table.cell(0, col_idx).paragraphs[0].runs[0].bold = True
+                    # 填充数据行
+                    for row_idx, data_line in enumerate(data_lines):
+                        cells = parse_row(data_line)
+                        for col_idx, cell_text in enumerate(cells):
+                            if col_idx < num_cols:
+                                table.cell(row_idx+1, col_idx).text = cell_text
+                    doc.add_paragraph()  # 表格后加空行
+            continue
+        # 普通段落
+        if line.strip():
+            doc.add_paragraph(line)
+        else:
+            doc.add_paragraph()
+        i += 1
+
 # ================== 管理员对话框 ==================
 @st.dialog("管理员登录")
 def admin_login_dialog():
@@ -277,7 +355,8 @@ with col4:
         else:
             admin_login_dialog()
 
-# ================== 语言文本（含完整 prompt） ==================
+# ================== 语言文本（含完整 prompt，优化表格格式） ==================
+# 注意：prompt 中明确要求使用标准 Markdown 表格格式，不要使用反斜杠转义
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -342,7 +421,7 @@ TEXTS = {
         "report_prompt": """
 你是一位资深产品分析师和研发顾问，拥有25年消费电子及智能硬件行业经验。请根据以下产品信息，生成一份专业的《产品可行性分析报告》。
 
-报告必须严格按照以下Markdown结构输出，内容要具体、有洞察，数据基于行业常识合理推断。
+报告必须严格按照以下Markdown结构输出，内容要具体、有洞察，数据基于行业常识合理推断。**重要：表格必须使用标准Markdown表格语法，即使用竖线分隔单元格，第二行为分隔行（例如 |---|---|），不要添加任何反斜杠转义字符。**
 
 # 《产品可行性分析报告》
 ## {product_name}
@@ -364,19 +443,37 @@ TEXTS = {
 
 ### 1.1 市场规模与趋势
 
-（请根据目标市场分别列出主要市场的规模、增长率、驱动因素和瓶颈，用表格形式）
+（请根据目标市场分别列出主要市场的规模、增长率、驱动因素和瓶颈，用表格形式，例如：）
+
+| 市场 | 规模 | 年增长率 | 主要驱动因素 | 主要瓶颈 |
+|------|------|----------|--------------|----------|
+| 美国 | ... | ... | ... | ... |
+| 中国 | ... | ... | ... | ... |
 
 ### 1.2 用户画像
 
-（用表格描述核心用户特征）
+（用表格描述核心用户特征，例如：）
+
+| 维度 | 描述 |
+|------|------|
+| 核心用户 | ... |
+| 使用场景 | ... |
 
 ### 1.3 用户痛点分析
 
-（列出3-5个核心痛点，用表格说明提及频率和描述）
+（列出3-5个核心痛点，用表格说明提及频率和描述，例如：）
+
+| 痛点 | 提及频率 | 说明 |
+|------|----------|------|
+| ... | 高/中/低 | ... |
 
 ### 1.4 关键功能需求排序
 
-（用表格列出功能、重要性评分和说明）
+（用表格列出功能、重要性评分和说明，例如：）
+
+| 功能 | 重要性 | 说明 |
+|------|--------|------|
+| ... | 10/10 | ... |
 
 ---
 
@@ -384,11 +481,19 @@ TEXTS = {
 
 ### 2.1 主要竞争对手
 
-（根据产品品类，列出至少3个主要竞品，用表格说明品牌、产品、优势、劣势、定价区间）
+（根据产品品类，列出至少3个主要竞品，用表格说明品牌、产品、优势、劣势、定价区间，例如：）
+
+| 品牌 | 产品 | 优势 | 劣势 | 定价区间 |
+|------|------|------|------|----------|
+| ... | ... | ... | ... | ... |
 
 ### 2.2 竞品功能对比
 
-（选择5-6个关键功能进行对比，用表格展示）
+（选择5-6个关键功能进行对比，用表格展示，例如：）
+
+| 功能 | 竞品A | 竞品B | 竞品C | 空白机会 |
+|------|-------|-------|-------|----------|
+| ... | ⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ | ... |
 
 ### 2.3 市场空白点分析
 
@@ -402,6 +507,10 @@ TEXTS = {
 
 （用表格描述主要渠道类型、占比、特点、适合度）
 
+| 渠道类型 | 占比 | 特点 | 适合度评估 |
+|----------|------|------|------------|
+| ... | % | ... | 高/中/低 |
+
 ### 3.2 客户现有渠道现状
 
 （基于用户输入：渠道情况={channel_status}，渠道详情={channel_detail}，品牌认知度={brand_status}，进行分析）
@@ -409,6 +518,11 @@ TEXTS = {
 ### 3.3 渠道策略建议
 
 （按年份给出渠道拓展建议，用表格）
+
+| 阶段 | 渠道策略 | 具体行动 |
+|------|----------|----------|
+| 第1年 | ... | ... |
+| 第2年 | ... | ... |
 
 ---
 
@@ -418,13 +532,27 @@ TEXTS = {
 
 （用表格列出关键技术项、要求、客户现有能力、风险评估）
 
+| 技术项 | 要求 | 客户现有能力 | 风险评估 |
+|--------|------|--------------|----------|
+| ... | ... | ... | 高/中/低 |
+
 ### 4.2 开发周期估算
 
 （用表格列出阶段、时间、关键任务）
 
+| 阶段 | 时间 | 关键任务 |
+|------|------|----------|
+| 概念验证 | 月 | ... |
+| 工程样机 | 月 | ... |
+| 总计 | 月 | |
+
 ### 4.3 关键风险点
 
 （用表格列出风险、可能性、影响、应对措施）
+
+| 风险 | 可能性 | 影响 | 应对措施 |
+|------|--------|------|----------|
+| ... | 高/中/低 | 高/中/低 | ... |
 
 ---
 
@@ -438,9 +566,20 @@ TEXTS = {
 
 （3年预测，用表格）
 
+| 年份 | 营收 | 关键假设 |
+|------|------|----------|
+| 第1年 | 金额 | ... |
+| 第2年 | 金额 | ... |
+
 ### 5.3 投资回报估算
 
 （用表格列出研发投入、市场推广、首批生产成本、总启动资金、毛利率、盈亏平衡点）
+
+| 项目 | 金额 | 说明 |
+|------|------|------|
+| 研发投入 | ... | ... |
+| 总启动资金 | ... | |
+| 毛利率 | % | |
 
 ---
 
@@ -450,9 +589,17 @@ TEXTS = {
 
 （用表格打分：市场吸引力、技术可行性、渠道匹配度、竞争格局、投资回报，各1-10分，并说明）
 
+| 维度 | 评分（1-10） | 说明 |
+|------|--------------|------|
+| 市场吸引力 | 9 | ... |
+
 ### 6.2 差异化定位建议
 
 （给出2-3个定位选项，用表格分析优势和风险）
+
+| 选项 | 定位 | 优势 | 风险 |
+|------|------|------|------|
+| 选项A | ... | ... | ... |
 
 ### 6.3 最终建议
 
@@ -526,7 +673,7 @@ TEXTS = {
         "report_prompt": """
 You are a senior product analyst and R&D consultant with 25 years of experience in consumer electronics and smart hardware. Based on the following product information, generate a professional "Product Feasibility Analysis Report".
 
-The report must strictly follow the Markdown structure below. The content should be specific, insightful, and based on industry common sense.
+The report must strictly follow the Markdown structure below. The content should be specific, insightful, and based on industry common sense. **Important: Tables must use standard Markdown table syntax (e.g., | Header | Header |, |---|---|). Do not add any backslash escape characters.**
 
 # Product Feasibility Analysis Report
 ## {product_name}
@@ -653,7 +800,6 @@ Output the report directly without additional explanation. For information not p
 lang = st.session_state.lang
 t = TEXTS[lang]
 
-# ================== 页面标题 ==================
 st.title(t["title"])
 st.markdown("---")
 
@@ -663,7 +809,6 @@ with st.sidebar:
     if report_key_input:
         valid, remaining, expiry_str, lic_type = activate_license(report_key_input)
         if valid:
-            st.session_state.watermark_hidden = True
             st.success(f"授权成功！剩余 {remaining} 次，有效期至 {expiry_str[:10]}")
         else:
             st.error("无效的 Report Key")
@@ -744,13 +889,14 @@ col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
 with col_btn2:
     submitted = st.button(t["submit_btn"], type="primary", use_container_width=True)
 
-# ================== 报告生成逻辑（检查授权） ==================
+# ================== 报告生成逻辑 ==================
 if submitted:
     if not product_name:
         st.error(t["product_name_missing"])
     elif not st.session_state.ai_api_key:
         st.error(t["api_key_missing"])
     else:
+        # 检查授权
         if not st.session_state.admin_logged_in:
             if not report_key_input or report_key_input not in REPORT_KEYS:
                 st.error(t["no_license"])
@@ -822,7 +968,7 @@ if submitted:
                 except Exception as e:
                     st.error(f"{t['error_prefix']}{e}")
 
-# ================== 显示报告 ==================
+# ================== 显示报告（条件加载防复制和水印） ==================
 current_report = None
 if lang == "zh":
     current_report = st.session_state.report_content_zh
@@ -830,27 +976,21 @@ else:
     current_report = st.session_state.report_content_en
 
 if current_report:
-    add_security_css()
-    show_watermark = not (st.session_state.watermark_hidden or st.session_state.admin_logged_in)
+    # 判断是否高级用户（管理员 或 非试用版授权码）
+    premium = is_premium_user(report_key_input) if report_key_input else False
+    # 高级用户：不添加防复制限制，不显示水印；试用版用户：添加限制，显示水印
+    add_security_css(disable=premium)
+    show_watermark = not (premium or st.session_state.admin_logged_in)
     add_dynamic_watermark(lang, hide=not show_watermark)
     st.markdown(f"## {t['report_title']}")
-    st.markdown(f'<div class="report-container">{current_report}</div>', unsafe_allow_html=True)
+    st.markdown(current_report, unsafe_allow_html=True)
     
     st.markdown("---")
     st.markdown(f"### {t['download_section']}")
     if report_key_input and report_key_input in REPORT_KEYS:
+        # 生成 Word 文档（使用表格解析）
         doc = Document()
-        lines = current_report.split('\n')
-        for line in lines:
-            if line.startswith('# '):
-                doc.add_heading(line[2:], level=1)
-            elif line.startswith('## '):
-                doc.add_heading(line[3:], level=2)
-            elif line.startswith('### '):
-                doc.add_heading(line[4:], level=3)
-            else:
-                if line.strip():
-                    doc.add_paragraph(line)
+        markdown_to_docx(current_report, doc)
         doc_bytes = BytesIO()
         doc.save(doc_bytes)
         doc_bytes.seek(0)
