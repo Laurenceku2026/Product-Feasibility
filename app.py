@@ -350,24 +350,7 @@ def admin_settings_dialog():
     st.markdown("---")
     st.subheader("永久修改 API Key")
     st.markdown("请前往 [Streamlit Cloud Secrets](https://share.streamlit.io/) 修改 `AI_API_KEY` 和 `AI_BASE_URL`，然后重启应用。")
-
-# ================== 右上角按钮 ==================
-col1, col2, col3, col4 = st.columns([8, 1, 1, 1])
-with col2:
-    if st.button("中文", key="zh_btn"):
-        st.session_state.lang = "zh"
-        st.rerun()
-with col3:
-    if st.button("English", key="en_btn"):
-        st.session_state.lang = "en"
-        st.rerun()
-with col4:
-    if st.button("⚙️", key="settings_btn"):
-        if st.session_state.admin_logged_in:
-            admin_settings_dialog()
-        else:
-            admin_login_dialog()
-            # ================== 语言文本 ==================
+# ================== 语言文本 ==================
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -894,31 +877,34 @@ if submitted:
                             messages=[{"role": "user", "content": prompt}],
                             temperature=0.7,
                         )
-report_content = response.choices[0].message.content
-
-# 获取当前日期
-if lang == "zh":
-    current_date = datetime.now().strftime("%Y年%m月%d日")
-    report_content = re.sub(r'\d{4}年\d{1,2}月\d{1,2}日', current_date, report_content)
-    report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
-else:
-    current_date = datetime.now().strftime("%B %d, %Y")
-    report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
-    report_content = re.sub(r'[A-Z][a-z]+ \d{1,2}, \d{4}', current_date, report_content)
-
-# 替换占位符
-report_content = report_content.replace("{{CURRENT_DATE}}", current_date)
-report_content = report_content.replace("{{ANALYST_INFO}}", analyst_info)
-
-# 额外保险：强制替换分析人表格行（确保与侧边栏一致）
-if lang == "zh":
-    # 匹配 "| 分析人 | 任何内容 |" 替换为 "| 分析人 | analyst_info |"
-    report_content = re.sub(r'(\| 分析人 \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
-else:
-    report_content = re.sub(r'(\| Analyst \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
-
-# 移除所有星号
-report_content = re.sub(r'\*+', '', report_content)                        
+                        report_content = response.choices[0].message.content
+                        
+                        # 获取当前日期
+                        if lang == "zh":
+                            current_date = datetime.now().strftime("%Y年%m月%d日")
+                            # 替换中文日期格式
+                            report_content = re.sub(r'\d{4}年\d{1,2}月\d{1,2}日', current_date, report_content)
+                            report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
+                        else:
+                            current_date = datetime.now().strftime("%B %d, %Y")
+                            # 替换英文日期格式
+                            report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
+                            report_content = re.sub(r'[A-Z][a-z]+ \d{1,2}, \d{4}', current_date, report_content)
+                        
+                        # 替换占位符
+                        report_content = report_content.replace("{{CURRENT_DATE}}", current_date)
+                        report_content = report_content.replace("{{ANALYST_INFO}}", analyst_info)
+                        
+                        # 强制替换分析人表格行（确保与侧边栏一致）
+                        if lang == "zh":
+                            # 匹配 "| 分析人 | 任何内容 |" 替换为 "| 分析人 | analyst_info |"
+                            report_content = re.sub(r'(\| 分析人 \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
+                        else:
+                            report_content = re.sub(r'(\| Analyst \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
+                        
+                        # 移除所有星号
+                        report_content = re.sub(r'\*+', '', report_content)
+                        
                         if lang == "zh":
                             st.session_state.report_content_zh = report_content
                         else:
@@ -968,3 +954,20 @@ if current_report:
 else:
     st.markdown("---")
     st.caption(t["footer"])
+# ================== 右上角按钮 ==================
+col1, col2, col3, col4 = st.columns([8, 1, 1, 1])
+with col2:
+    if st.button("中文", key="zh_btn"):
+        st.session_state.lang = "zh"
+        st.rerun()
+with col3:
+    if st.button("English", key="en_btn"):
+        st.session_state.lang = "en"
+        st.rerun()
+with col4:
+    if st.button("⚙️", key="settings_btn"):
+        if st.session_state.admin_logged_in:
+            admin_settings_dialog()
+        else:
+            admin_login_dialog()
+            
