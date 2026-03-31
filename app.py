@@ -33,6 +33,10 @@ try:
     PERSISTENT_BASE_URL = st.secrets["AI_BASE_URL"]
 except:
     PERSISTENT_BASE_URL = "https://api.deepseek.com"
+try:
+    PERSISTENT_MODEL_NAME = st.secrets["AI_MODEL_NAME"]
+except:
+    PERSISTENT_MODEL_NAME = "deepseek-chat"  # 默认 DeepSeek 模型
 
 # ================== 授权类型定义 ==================
 LICENSE_TYPES = {
@@ -71,6 +75,8 @@ if "ai_api_key" not in st.session_state:
     st.session_state.ai_api_key = PERSISTENT_API_KEY
 if "ai_base_url" not in st.session_state:
     st.session_state.ai_base_url = PERSISTENT_BASE_URL
+if "ai_model_name" not in st.session_state:
+    st.session_state.ai_model_name = PERSISTENT_MODEL_NAME
 if "usage_db" not in st.session_state:
     st.session_state.usage_db = load_usage_data()
 if "current_report_key" not in st.session_state:
@@ -127,10 +133,8 @@ def is_premium_user(report_key):
 
 def generate_report_key(license_type, custom_uses=None, custom_months=None):
     """生成随机 Report Key，并写入 usage_db"""
-    # 生成随机字符串（8位）
     random_str = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
     new_key = f"{license_type.upper()}_{random_str}"
-    # 确定次数和有效期
     if license_type == "custom":
         max_uses = custom_uses
         max_months = custom_months
@@ -324,9 +328,11 @@ def admin_settings_dialog():
     st.subheader("AI API 配置（临时覆盖）")
     new_key = st.text_input("API Key", value=st.session_state.ai_api_key, type="password")
     new_url = st.text_input("Base URL", value=st.session_state.ai_base_url)
+    new_model = st.text_input("模型名称", value=st.session_state.ai_model_name)
     if st.button("应用临时配置"):
         st.session_state.ai_api_key = new_key
         st.session_state.ai_base_url = new_url
+        st.session_state.ai_model_name = new_model
         st.success("当前会话已使用新配置（刷新页面后恢复为永久配置）")
         st.rerun()
     st.markdown("---")
@@ -367,7 +373,7 @@ def admin_settings_dialog():
     
     st.markdown("---")
     st.subheader("永久修改 API Key")
-    st.markdown("请前往 [Streamlit Cloud Secrets](https://share.streamlit.io/) 修改 `AI_API_KEY` 和 `AI_BASE_URL`，然后重启应用。")
+    st.markdown("请前往 [Streamlit Cloud Secrets](https://share.streamlit.io/) 修改 `AI_API_KEY`、`AI_BASE_URL` 和 `AI_MODEL_NAME`，然后重启应用。")
 
 # ================== 右上角按钮 ==================
 col1, col2, col3, col4 = st.columns([8, 1, 1, 1])
@@ -908,7 +914,7 @@ if submitted:
                             brand_status=brand_status
                         )
                         response = client.chat.completions.create(
-                            model="deepseek-chat",
+                            model=st.session_state.ai_model_name,  # 使用可配置的模型名称
                             messages=[{"role": "user", "content": prompt}],
                             temperature=0.7,
                         )
