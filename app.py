@@ -36,7 +36,7 @@ except:
 try:
     PERSISTENT_MODEL_NAME = st.secrets["AI_MODEL_NAME"]
 except:
-    PERSISTENT_MODEL_NAME = "deepseek-chat"  # 默认 DeepSeek 模型
+    PERSISTENT_MODEL_NAME = "deepseek-chat"
 
 # ================== 授权类型定义 ==================
 LICENSE_TYPES = {
@@ -85,14 +85,19 @@ if "current_license_type" not in st.session_state:
     st.session_state.current_license_type = None
 
 def activate_license(report_key):
-    """激活或加载授权信息，不修改剩余次数"""
+    """激活或加载授权信息，返回 (是否有效, 剩余次数, 有效期字符串, 类型)"""
     if report_key in st.session_state.usage_db:
         record = st.session_state.usage_db[report_key]
         remaining = record["remaining"]
         expiry_str = record["expiry"]
-        lic_type = record.get("type", "unknown")
-        st.session_state.current_license_type = lic_type
-        return True, remaining, expiry_str, lic_type
+        expiry = datetime.fromisoformat(expiry_str)
+        if remaining > 0 and datetime.now() <= expiry:
+            lic_type = record.get("type", "unknown")
+            st.session_state.current_license_type = lic_type
+            return True, remaining, expiry_str, lic_type
+        else:
+            st.session_state.current_license_type = None
+            return False, 0, None, None
     else:
         st.session_state.current_license_type = None
         return False, 0, None, None
@@ -100,14 +105,13 @@ def activate_license(report_key):
 def consume_usage(report_key):
     if st.session_state.admin_logged_in:
         return True
-    if not report_key or report_key not in st.session_state.usage_db:
+    if not report_key:
         return False
+    valid, remaining, expiry_str, _ = activate_license(report_key)
+    if not valid:
+        return False
+    # 消耗次数
     record = st.session_state.usage_db[report_key]
-    remaining = record["remaining"]
-    expiry_str = record["expiry"]
-    expiry = datetime.fromisoformat(expiry_str)
-    if datetime.now() > expiry or remaining <= 0:
-        return False
     record["remaining"] -= 1
     record["total_uses"] = record.get("total_uses", 0) + 1
     save_usage_data(st.session_state.usage_db)
@@ -116,19 +120,18 @@ def consume_usage(report_key):
 def get_remaining_info(report_key):
     if st.session_state.admin_logged_in:
         return "无限", "永久"
-    if not report_key or report_key not in st.session_state.usage_db:
+    valid, remaining, expiry_str, _ = activate_license(report_key)
+    if not valid:
         return "未授权", "无"
-    record = st.session_state.usage_db[report_key]
-    remaining = record["remaining"]
-    expiry = datetime.fromisoformat(record["expiry"])
-    expiry_str = expiry.strftime("%Y-%m-%d")
-    return str(remaining), expiry_str
+    expiry = datetime.fromisoformat(expiry_str)
+    return str(remaining), expiry.strftime("%Y-%m-%d")
 
 def is_premium_user(report_key):
     if st.session_state.admin_logged_in:
         return True
-    if report_key and report_key in st.session_state.usage_db:
-        return True
+    if report_key:
+        valid, _, _, _ = activate_license(report_key)
+        return valid
     return False
 
 def generate_report_key(license_type, custom_uses=None, custom_months=None):
@@ -789,12 +792,16 @@ with st.sidebar:
         valid, remaining, expiry_str, lic_type = activate_license(report_key_input)
         if valid:
             st.success(f"授权成功！剩余 {remaining} 次，有效期至 {expiry_str[:10]}")
+            st.session_state.current_report_key = report_key_input
         else:
-            st.error("无效的授权码")
+            st.error("授权码无效或已过期")
+            # 如果无效，清除 session_state 中的密钥，防止后续误用
+            st.session_state.current_report_key = ""
+            st.session_state.current_license_type = None
     if st.session_state.admin_logged_in:
         st.info("管理员模式：无限使用")
     else:
-        if report_key_input and report_key_input in st.session_state.usage_db:
+        if report_key_input and is_premium_user(report_key_input):
             remaining_str, expiry_str = get_remaining_info(report_key_input)
             st.markdown(f"**{t['license_info']}**")
             st.write(f"{t['remaining_label']}: {remaining_str}")
@@ -879,11 +886,13 @@ if submitted:
         can_generate = True
         if st.session_state.admin_logged_in:
             can_generate = True
-        elif report_key_input and report_key_input in st.session_state.usage_db:
+        elif is_premium_user(report_key_input):
+            # 高级用户，消耗次数
             if not consume_usage(report_key_input):
                 st.error(t["trial_ended"])
                 can_generate = False
         else:
+            # 访客模式，允许生成但有限制
             can_generate = True
         if can_generate:
             with spinner_placeholder.container():
@@ -914,7 +923,7 @@ if submitted:
                             brand_status=brand_status
                         )
                         response = client.chat.completions.create(
-                            model=st.session_state.ai_model_name,  # 使用可配置的模型名称
+                            model=st.session_state.ai_model_name,
                             messages=[{"role": "user", "content": prompt}],
                             temperature=0.7,
                         )
