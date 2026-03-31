@@ -895,9 +895,7 @@ else:
 # 替换报告中的日期占位符
 report_content = report_content.replace("自动生成", current_date)
 
-# 移除所有星号（避免出现 ** 等）
-report_content = re.sub(r'\*+', '', report_content)
-                    
+                   
                     # 移除所有星号（避免出现 ** 等）
                     report_content = re.sub(r'\*+', '', report_content)
                     if lang == "zh":
