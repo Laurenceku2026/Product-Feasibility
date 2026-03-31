@@ -367,7 +367,7 @@ with col4:
             admin_settings_dialog()
         else:
             admin_login_dialog()
-            # ================== 语言文本（使用占位符 {{CURRENT_DATE}} 和 {{ANALYST_INFO}}） ==================
+            # ================== 语言文本（使用占位符） ==================
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -836,13 +836,13 @@ with col6:
 st.markdown(f"#### {t['other_info']}")
 additional_info = st.text_area("", placeholder=t["other_ph"], height=80)
 
-# ================== 提交按钮（下方放置 spinner 容器） ==================
+# ================== 提交按钮 ==================
 st.markdown("---")
 col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
 with col_btn2:
     submitted = st.button(t["submit_btn"], type="primary", use_container_width=True)
 
-# 创建一个空容器，用于放置 spinner（确保显示在按钮下方）
+# 创建一个空容器，用于显示加载动画（位于按钮下方）
 spinner_placeholder = st.empty()
 
 # ================== 报告生成逻辑 ==================
