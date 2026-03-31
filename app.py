@@ -276,7 +276,10 @@ def markdown_to_docx(md_text, doc):
                 if num_cols > 0:
                     table = doc.add_table(rows=1+len(data_lines), cols=num_cols)
                     table.style = 'Table Grid'
-                    # 不设置固定列宽，让 Word 根据内容自动调整
+                    # 关键：启用自动调整列宽（根据内容）
+                    table.autofit = True
+                    # 设置表格宽度为页面宽度（可选，让表格更美观）
+                    table.width = Inches(6.5)
                     for row in table.rows:
                         for cell in row.cells:
                             set_cell_border(cell, RGBColor(0xCC, 0xCC, 0xCC))
