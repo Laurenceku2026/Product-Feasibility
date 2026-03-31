@@ -1,8 +1,10 @@
 import streamlit as st
 import openai
-import uuid
+import json
+import os
 from io import BytesIO
 from docx import Document
+from datetime import datetime, timedelta
 
 # ================== 页面配置 ==================
 st.set_page_config(
@@ -25,6 +27,40 @@ try:
 except:
     PERSISTENT_BASE_URL = "https://api.deepseek.com"
 
+# ================== 授权类型定义 ==================
+LICENSE_TYPES = {
+    "trial": {"name": "试用版", "max_uses": 60, "max_months": 3, "en_name": "Trial"},
+    "level1": {"name": "一级用户", "max_uses": 100, "max_months": 12, "en_name": "Level 1"},
+    "level2": {"name": "二级用户", "max_uses": 300, "max_months": 24, "en_name": "Level 2"},
+    "level3": {"name": "三级用户", "max_uses": 500, "max_months": 36, "en_name": "Level 3"},
+    "level4": {"name": "四级用户", "max_uses": 1000, "max_months": 60, "en_name": "Level 4"},
+}
+
+# 预定义的 Report Key 及其对应的授权类型
+REPORT_KEYS = {
+    "Trial2026": "trial",
+    "Gold100": "level1",
+    "Silver300": "level2",
+    "Platinum500": "level3",
+    "Diamond1000": "level4",
+}
+
+# ================== 持久化存储文件路径 ==================
+USAGE_FILE = "usage_data.json"
+
+def load_usage_data():
+    if os.path.exists(USAGE_FILE):
+        try:
+            with open(USAGE_FILE, "r") as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_usage_data(data):
+    with open(USAGE_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
 # ================== 初始化 session state ==================
 if "lang" not in st.session_state:
     st.session_state.lang = "zh"
@@ -38,6 +74,76 @@ if "ai_api_key" not in st.session_state:
     st.session_state.ai_api_key = PERSISTENT_API_KEY
 if "ai_base_url" not in st.session_state:
     st.session_state.ai_base_url = PERSISTENT_BASE_URL
+if "active_license" not in st.session_state:
+    st.session_state.active_license = None
+if "license_remaining" not in st.session_state:
+    st.session_state.license_remaining = 0
+if "license_expiry" not in st.session_state:
+    st.session_state.license_expiry = None
+if "watermark_hidden" not in st.session_state:
+    st.session_state.watermark_hidden = False
+
+if "usage_db" not in st.session_state:
+    st.session_state.usage_db = load_usage_data()
+
+# ================== 辅助函数 ==================
+def activate_license(report_key):
+    if report_key in REPORT_KEYS:
+        lic_type = REPORT_KEYS[report_key]
+        lic_info = LICENSE_TYPES[lic_type]
+        max_uses = lic_info["max_uses"]
+        max_months = lic_info["max_months"]
+        expiry = datetime.now() + timedelta(days=max_months*30)
+        expiry_str = expiry.isoformat()
+        if report_key in st.session_state.usage_db:
+            record = st.session_state.usage_db[report_key]
+            remaining = record.get("remaining", max_uses)
+            expiry_str = record.get("expiry", expiry_str)
+        else:
+            remaining = max_uses
+            st.session_state.usage_db[report_key] = {
+                "type": lic_type,
+                "remaining": remaining,
+                "expiry": expiry_str,
+                "total_uses": 0
+            }
+            save_usage_data(st.session_state.usage_db)
+        return True, remaining, expiry_str, lic_type
+    else:
+        return False, 0, None, None
+
+def consume_usage(report_key):
+    if st.session_state.admin_logged_in:
+        return True
+    if report_key not in REPORT_KEYS:
+        return False
+    if report_key not in st.session_state.usage_db:
+        success, _, _, _ = activate_license(report_key)
+        if not success:
+            return False
+    record = st.session_state.usage_db[report_key]
+    remaining = record["remaining"]
+    expiry_str = record["expiry"]
+    expiry = datetime.fromisoformat(expiry_str)
+    if datetime.now() > expiry or remaining <= 0:
+        return False
+    record["remaining"] -= 1
+    record["total_uses"] = record.get("total_uses", 0) + 1
+    save_usage_data(st.session_state.usage_db)
+    return True
+
+def get_remaining_info(report_key):
+    if st.session_state.admin_logged_in:
+        return "无限", "永久"
+    if report_key not in REPORT_KEYS:
+        return "未授权", "无"
+    if report_key not in st.session_state.usage_db:
+        return "未激活", "无"
+    record = st.session_state.usage_db[report_key]
+    remaining = record["remaining"]
+    expiry = datetime.fromisoformat(record["expiry"])
+    expiry_str = expiry.strftime("%Y-%m-%d")
+    return str(remaining), expiry_str
 
 # ================== 防复制/截屏 CSS + 动态水印 ==================
 def add_security_css():
@@ -95,7 +201,9 @@ def add_security_css():
     </script>
     """, unsafe_allow_html=True)
 
-def add_dynamic_watermark(lang):
+def add_dynamic_watermark(lang, hide):
+    if hide:
+        return
     if lang == "zh":
         watermark_text = "机密，样板报告，请联系 nc.ku@hotmail.com"
     else:
@@ -130,6 +238,25 @@ def admin_settings_dialog():
         st.success("当前会话已使用新配置（刷新页面后恢复为永久配置）")
         st.rerun()
     st.markdown("---")
+    st.subheader("授权管理")
+    st.write("当前已激活的 Report Key 及其剩余次数：")
+    for key, data in st.session_state.usage_db.items():
+        st.write(f"- {key}: {data['remaining']} 次剩余, 有效期至 {data['expiry'][:10]}")
+    new_key = st.text_input("手动添加/修改 Report Key", placeholder="例如 Trial2026")
+    new_remaining = st.number_input("剩余次数", min_value=0, step=1)
+    new_expiry = st.date_input("有效期至")
+    if st.button("添加/更新"):
+        if new_key:
+            st.session_state.usage_db[new_key] = {
+                "type": "manual",
+                "remaining": new_remaining,
+                "expiry": new_expiry.isoformat(),
+                "total_uses": 0
+            }
+            save_usage_data(st.session_state.usage_db)
+            st.success("已更新")
+            st.rerun()
+    st.markdown("---")
     st.subheader("永久修改 API Key")
     st.markdown("请前往 [Streamlit Cloud Secrets](https://share.streamlit.io/) 修改 `AI_API_KEY` 和 `AI_BASE_URL`，然后重启应用。")
 
@@ -150,8 +277,7 @@ with col4:
         else:
             admin_login_dialog()
 
-# ================== 语言文本（中英文 + 报告模板） ==================
-# 注意：report_prompt 内容与之前相同，为节省篇幅此处只保留结构，实际使用需完整粘贴
+# ================== 语言文本（含完整 prompt） ==================
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -165,8 +291,11 @@ TEXTS = {
         "api_status": "AI API 状态",
         "api_configured": "✅ 已配置",
         "api_not_configured": "❌ 未配置，请联系管理员",
-        "report_key_label": "Report Key（下载密钥）",
-        "report_key_help": "输入正确的密钥后才能下载报告文档",
+        "report_key_label": "Report Key（授权码）",
+        "report_key_help": "输入授权码激活服务",
+        "license_info": "授权信息",
+        "remaining_label": "剩余次数",
+        "expiry_label": "有效期至",
         "contact_info": "📞 **联系人：古生**  \n✉️ 电邮: nc.ku@hotmail.com  \n📱 电话/微信: +86-13823760640",
         "input_title": "📝 产品信息输入",
         "basic_info": "基本信息",
@@ -205,9 +334,11 @@ TEXTS = {
         "report_title": "📄 生成的可行性分析报告",
         "download_section": "📥 下载报告",
         "download_btn": "下载 Word 文档",
-        "key_error": "Report Key 错误，无法下载",
+        "key_error": "授权码错误，无法下载",
         "back_btn": "← 返回重新填写",
         "footer": "© 2026 Laurence Ku | AI产品可行性分析系统 | 基于25年研发管理经验",
+        "trial_ended": "试用已结束，请联系 nc.ku@hotmail.com",
+        "no_license": "请输入有效的 Report Key 激活服务。",
         "report_prompt": """
 你是一位资深产品分析师和研发顾问，拥有25年消费电子及智能硬件行业经验。请根据以下产品信息，生成一份专业的《产品可行性分析报告》。
 
@@ -345,7 +476,10 @@ TEXTS = {
         "api_configured": "✅ Configured",
         "api_not_configured": "❌ Not configured, contact admin",
         "report_key_label": "Report Key",
-        "report_key_help": "Enter the correct key to download the report document",
+        "report_key_help": "Enter the license key to activate service",
+        "license_info": "License Info",
+        "remaining_label": "Remaining uses",
+        "expiry_label": "Valid until",
         "contact_info": "📞 **Contact: Laurence Ku**  \n✉️ Email: nc.ku@hotmail.com  \n📱 Phone/Wechat: +86-13823760640",
         "input_title": "📝 Product Information Input",
         "basic_info": "Basic Information",
@@ -384,9 +518,11 @@ TEXTS = {
         "report_title": "📄 Generated Feasibility Analysis Report",
         "download_section": "📥 Download Report",
         "download_btn": "Download Word Document",
-        "key_error": "Incorrect Report Key, download not allowed",
+        "key_error": "Invalid Report Key, download not allowed",
         "back_btn": "← Back to re-enter",
         "footer": "© 2026 Laurence Ku | AI Product Feasibility System | Based on 25+ years R&D experience",
+        "trial_ended": "Trial finished, please contact nc.ku@hotmail.com",
+        "no_license": "Please enter a valid Report Key to activate service.",
         "report_prompt": """
 You are a senior product analyst and R&D consultant with 25 years of experience in consumer electronics and smart hardware. Based on the following product information, generate a professional "Product Feasibility Analysis Report".
 
@@ -524,6 +660,23 @@ st.markdown("---")
 # ================== 侧边栏 ==================
 with st.sidebar:
     report_key_input = st.text_input(t["report_key_label"], type="password", help=t["report_key_help"])
+    if report_key_input:
+        valid, remaining, expiry_str, lic_type = activate_license(report_key_input)
+        if valid:
+            st.session_state.watermark_hidden = True
+            st.success(f"授权成功！剩余 {remaining} 次，有效期至 {expiry_str[:10]}")
+        else:
+            st.error("无效的 Report Key")
+    if st.session_state.admin_logged_in:
+        st.info("管理员模式：无限使用")
+    else:
+        if report_key_input and report_key_input in REPORT_KEYS:
+            remaining_str, expiry_str = get_remaining_info(report_key_input)
+            st.markdown(f"**{t['license_info']}**")
+            st.write(f"{t['remaining_label']}: {remaining_str}")
+            st.write(f"{t['expiry_label']}: {expiry_str}")
+        else:
+            st.warning(t["no_license"])
     st.markdown("---")
     st.markdown(t["contact_info"])
     st.markdown("---")
@@ -591,47 +744,85 @@ col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
 with col_btn2:
     submitted = st.button(t["submit_btn"], type="primary", use_container_width=True)
 
-# ================== 报告生成逻辑（中英文独立存储） ==================
-REPORT_KEY = "MySecret2026"
-
+# ================== 报告生成逻辑（检查授权） ==================
 if submitted:
     if not product_name:
         st.error(t["product_name_missing"])
     elif not st.session_state.ai_api_key:
         st.error(t["api_key_missing"])
     else:
-        with st.spinner(t["generating"]):
-            try:
-                client = openai.OpenAI(
-                    api_key=st.session_state.ai_api_key,
-                    base_url=st.session_state.ai_base_url,
-                )
-                prompt_template = t["report_prompt"]
-                target_markets_str = ", ".join(target_markets)
-                prompt = prompt_template.format(
-                    product_name=product_name,
-                    product_description=product_description or "未提供",
-                    target_markets=target_markets_str,
-                    target_users=target_users or "未提供",
-                    channel_status=channel_status,
-                    channel_detail=channel_detail or "未提供",
-                    brand_status=brand_status
-                )
-                response = client.chat.completions.create(
-                    model="deepseek-chat",
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.7,
-                )
-                report_content = response.choices[0].message.content
-                if lang == "zh":
-                    st.session_state.report_content_zh = report_content
+        if not st.session_state.admin_logged_in:
+            if not report_key_input or report_key_input not in REPORT_KEYS:
+                st.error(t["no_license"])
+            else:
+                allowed = consume_usage(report_key_input)
+                if not allowed:
+                    st.error(t["trial_ended"])
                 else:
-                    st.session_state.report_content_en = report_content
-                st.rerun()
-            except Exception as e:
-                st.error(f"{t['error_prefix']}{e}")
+                    with st.spinner(t["generating"]):
+                        try:
+                            client = openai.OpenAI(
+                                api_key=st.session_state.ai_api_key,
+                                base_url=st.session_state.ai_base_url,
+                            )
+                            prompt_template = t["report_prompt"]
+                            target_markets_str = ", ".join(target_markets)
+                            prompt = prompt_template.format(
+                                product_name=product_name,
+                                product_description=product_description or "未提供",
+                                target_markets=target_markets_str,
+                                target_users=target_users or "未提供",
+                                channel_status=channel_status,
+                                channel_detail=channel_detail or "未提供",
+                                brand_status=brand_status
+                            )
+                            response = client.chat.completions.create(
+                                model="deepseek-chat",
+                                messages=[{"role": "user", "content": prompt}],
+                                temperature=0.7,
+                            )
+                            report_content = response.choices[0].message.content
+                            if lang == "zh":
+                                st.session_state.report_content_zh = report_content
+                            else:
+                                st.session_state.report_content_en = report_content
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"{t['error_prefix']}{e}")
+        else:
+            # 管理员直接生成
+            with st.spinner(t["generating"]):
+                try:
+                    client = openai.OpenAI(
+                        api_key=st.session_state.ai_api_key,
+                        base_url=st.session_state.ai_base_url,
+                    )
+                    prompt_template = t["report_prompt"]
+                    target_markets_str = ", ".join(target_markets)
+                    prompt = prompt_template.format(
+                        product_name=product_name,
+                        product_description=product_description or "未提供",
+                        target_markets=target_markets_str,
+                        target_users=target_users or "未提供",
+                        channel_status=channel_status,
+                        channel_detail=channel_detail or "未提供",
+                        brand_status=brand_status
+                    )
+                    response = client.chat.completions.create(
+                        model="deepseek-chat",
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.7,
+                    )
+                    report_content = response.choices[0].message.content
+                    if lang == "zh":
+                        st.session_state.report_content_zh = report_content
+                    else:
+                        st.session_state.report_content_en = report_content
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"{t['error_prefix']}{e}")
 
-# ================== 显示报告（改进：提示另一种语言的报告是否存在） ==================
+# ================== 显示报告 ==================
 current_report = None
 if lang == "zh":
     current_report = st.session_state.report_content_zh
@@ -640,13 +831,14 @@ else:
 
 if current_report:
     add_security_css()
-    add_dynamic_watermark(lang)
+    show_watermark = not (st.session_state.watermark_hidden or st.session_state.admin_logged_in)
+    add_dynamic_watermark(lang, hide=not show_watermark)
     st.markdown(f"## {t['report_title']}")
     st.markdown(f'<div class="report-container">{current_report}</div>', unsafe_allow_html=True)
     
     st.markdown("---")
     st.markdown(f"### {t['download_section']}")
-    if report_key_input == REPORT_KEY:
+    if report_key_input and report_key_input in REPORT_KEYS:
         doc = Document()
         lines = current_report.split('\n')
         for line in lines:
@@ -678,12 +870,5 @@ if current_report:
             st.session_state.report_content_en = None
         st.rerun()
 else:
-    # 当前语言没有报告，检查另一种语言是否有报告
-    other_lang = "en" if lang == "zh" else "zh"
-    other_report = st.session_state.report_content_en if other_lang == "en" else st.session_state.report_content_zh
-    if other_report:
-        st.info(f"⚠️ 当前{ '中文' if lang == 'zh' else 'English' }报告尚未生成。您已有{ '中文' if other_lang == 'zh' else 'English' }报告，可切换语言查看。")
-    else:
-        st.info("💡 请填写产品信息并点击「开始分析」生成报告。")
     st.markdown("---")
     st.caption(t["footer"])
