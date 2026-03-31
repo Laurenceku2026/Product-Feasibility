@@ -887,18 +887,32 @@ if submitted:
         if st.session_state.admin_logged_in:
             can_generate = True
         elif is_premium_user(report_key_input):
-            # 高级用户，消耗次数
             if not consume_usage(report_key_input):
                 st.error(t["trial_ended"])
                 can_generate = False
         else:
-            # 访客模式，允许生成但有限制
             can_generate = True
         if can_generate:
             with spinner_placeholder.container():
+                # 添加按钮脉冲动画 CSS
+                st.markdown("""
+                <style>
+                    @keyframes pulse {
+                        0% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7); }
+                        70% { box-shadow: 0 0 0 10px rgba(0, 123, 255, 0); }
+                        100% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0); }
+                    }
+                    .stButton button {
+                        animation: pulse 1.5s infinite;
+                    }
+                </style>
+                """, unsafe_allow_html=True)
                 with st.spinner(t["generating"]):
                     try:
-                        # 构建分析人信息
+                        # ... 报告生成代码（保持不变） ...
+
+
+                    # 构建分析人信息
                         if analyst_name:
                             if analyst_title:
                                 analyst_info = f"{analyst_name} ({analyst_title})"
