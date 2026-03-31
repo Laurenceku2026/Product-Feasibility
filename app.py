@@ -894,27 +894,31 @@ if submitted:
                             messages=[{"role": "user", "content": prompt}],
                             temperature=0.7,
                         )
-                        report_content = response.choices[0].message.content
-                        
-                        # 获取当前日期
-                        if lang == "zh":
-                            current_date = datetime.now().strftime("%Y年%m月%d日")
-                            # 替换中文日期格式
-                            report_content = re.sub(r'\d{4}年\d{1,2}月\d{1,2}日', current_date, report_content)
-                            report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
-                        else:
-                            current_date = datetime.now().strftime("%B %d, %Y")
-                            # 替换英文日期格式
-                            report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
-                            report_content = re.sub(r'[A-Z][a-z]+ \d{1,2}, \d{4}', current_date, report_content)
-                        
-                        # 替换占位符
-                        report_content = report_content.replace("{{CURRENT_DATE}}", current_date)
-                        report_content = report_content.replace("{{ANALYST_INFO}}", analyst_info)
-                        
-                        # 移除所有星号
-                        report_content = re.sub(r'\*+', '', report_content)
-                        
+report_content = response.choices[0].message.content
+
+# 获取当前日期
+if lang == "zh":
+    current_date = datetime.now().strftime("%Y年%m月%d日")
+    report_content = re.sub(r'\d{4}年\d{1,2}月\d{1,2}日', current_date, report_content)
+    report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
+else:
+    current_date = datetime.now().strftime("%B %d, %Y")
+    report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
+    report_content = re.sub(r'[A-Z][a-z]+ \d{1,2}, \d{4}', current_date, report_content)
+
+# 替换占位符
+report_content = report_content.replace("{{CURRENT_DATE}}", current_date)
+report_content = report_content.replace("{{ANALYST_INFO}}", analyst_info)
+
+# 额外保险：强制替换分析人表格行（确保与侧边栏一致）
+if lang == "zh":
+    # 匹配 "| 分析人 | 任何内容 |" 替换为 "| 分析人 | analyst_info |"
+    report_content = re.sub(r'(\| 分析人 \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
+else:
+    report_content = re.sub(r'(\| Analyst \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
+
+# 移除所有星号
+report_content = re.sub(r'\*+', '', report_content)                        
                         if lang == "zh":
                             st.session_state.report_content_zh = report_content
                         else:
