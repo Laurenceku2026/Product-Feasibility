@@ -110,7 +110,6 @@ def consume_usage(report_key):
     valid, remaining, expiry_str, _ = activate_license(report_key)
     if not valid:
         return False
-    # 消耗次数
     record = st.session_state.usage_db[report_key]
     record["remaining"] -= 1
     record["total_uses"] = record.get("total_uses", 0) + 1
@@ -795,7 +794,6 @@ with st.sidebar:
             st.session_state.current_report_key = report_key_input
         else:
             st.error("授权码无效或已过期")
-            # 如果无效，清除 session_state 中的密钥，防止后续误用
             st.session_state.current_report_key = ""
             st.session_state.current_license_type = None
     if st.session_state.admin_logged_in:
@@ -873,7 +871,7 @@ col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
 with col_btn2:
     submitted = st.button(t["submit_btn"], type="primary", use_container_width=True)
 
-# 创建一个空容器，用于显示加载动画（位于按钮下方）
+# 创建一个空容器，用于显示加载动画和文字（位于按钮下方）
 spinner_placeholder = st.empty()
 
 # ================== 报告生成逻辑 ==================
@@ -887,16 +885,17 @@ if submitted:
         if st.session_state.admin_logged_in:
             can_generate = True
         elif is_premium_user(report_key_input):
-            # 高级用户，消耗次数
             if not consume_usage(report_key_input):
                 st.error(t["trial_ended"])
                 can_generate = False
         else:
-            # 访客模式，允许生成但有限制
             can_generate = True
         if can_generate:
             with spinner_placeholder.container():
-                with st.spinner(t["generating"]):
+                # 在按钮下方显示居中文字（保留脉冲动画）
+                st.markdown(f'<div style="text-align: center; margin-top: 10px;">{t["generating"]}</div>', unsafe_allow_html=True)
+                # 使用空文本的 spinner，只显示奔跑小人动画（默认在右上角）
+                with st.spinner(""):
                     try:
                         # 构建分析人信息
                         if analyst_name:
