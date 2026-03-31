@@ -896,13 +896,22 @@ if submitted:
                         )
                         report_content = response.choices[0].message.content
                         
-                        # 替换日期占位符
-                        if lang == "zh":
-                            current_date = datetime.now().strftime("%Y年%m月%d日")
-                        else:
-                            current_date = datetime.now().strftime("%B %d, %Y")
-                        report_content = report_content.replace("{{CURRENT_DATE}}", current_date)
-                        
+# 替换日期：同时处理占位符和已有的日期格式
+import re
+
+# 获取当前日期
+if lang == "zh":
+    current_date = datetime.now().strftime("%Y年%m月%d日")
+    # 替换中文日期格式：2023年10月27日
+    report_content = re.sub(r'\d{4}年\d{1,2}月\d{1,2}日', current_date, report_content)
+else:
+    current_date = datetime.now().strftime("%B %d, %Y")
+    # 替换英文日期格式：October 27, 2023 或 2023-10-27
+    report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
+    report_content = re.sub(r'[A-Z][a-z]+ \d{1,2}, \d{4}', current_date, report_content)
+
+# 再替换占位符
+report_content = report_content.replace("{{CURRENT_DATE}}", current_date)                        
                         # 替换分析人占位符
                         report_content = report_content.replace("{{ANALYST_INFO}}", analyst_info)
                         
