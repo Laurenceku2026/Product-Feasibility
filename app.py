@@ -887,78 +887,78 @@ if submitted:
         if st.session_state.admin_logged_in:
             can_generate = True
         elif is_premium_user(report_key_input):
+            # 高级用户，消耗次数
             if not consume_usage(report_key_input):
                 st.error(t["trial_ended"])
                 can_generate = False
         else:
-            can_generate = True    
-        if can_generate:with spinner_placeholder.container():
-    # 在按钮下方显示居中文字
-    st.markdown(f'<div style="text-align: center; margin-top: 10px;">{t["generating"]}</div>', unsafe_allow_html=True)
-    # 使用空文本的 spinner，保留奔跑小人动画在右上角
-    with st.spinner(""):
-        try:
-            # 以下报告生成代码完全不变（请保持原有内容）
-            if analyst_name:
-                if analyst_title:
-                    analyst_info = f"{analyst_name} ({analyst_title})"
-                else:
-                    analyst_info = analyst_name
-            else:
-                analyst_info = "AI 分析师（基于行业数据库）" if lang == "zh" else "AI Analyst (based on industry database)"
-            
-            client = openai.OpenAI(
-                api_key=st.session_state.ai_api_key,
-                base_url=st.session_state.ai_base_url,
-            )
-            prompt_template = t["report_prompt"]
-            target_markets_str = ", ".join(target_markets)
-            prompt = prompt_template.format(
-                product_name=product_name,
-                product_description=product_description or "未提供",
-                target_markets=target_markets_str,
-                target_users=target_users or "未提供",
-                channel_status=channel_status,
-                channel_detail=channel_detail or "未提供",
-                brand_status=brand_status
-            )
-            response = client.chat.completions.create(
-                model=st.session_state.ai_model_name,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.7,
-            )
-            report_content = response.choices[0].message.content
-            
-            # 日期替换
-            if lang == "zh":
-                current_date = datetime.now().strftime("%Y年%m月%d日")
-                report_content = re.sub(r'\d{4}年\d{1,2}月\d{1,2}日', current_date, report_content)
-                report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
-            else:
-                current_date = datetime.now().strftime("%B %d, %Y")
-                report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
-                report_content = re.sub(r'[A-Z][a-z]+ \d{1,2}, \d{4}', current_date, report_content)
-            
-            # 占位符替换
-            report_content = report_content.replace("{{CURRENT_DATE}}", current_date)
-            report_content = report_content.replace("{{ANALYST_INFO}}", analyst_info)
-            
-            # 强制替换分析人表格行
-            if lang == "zh":
-                report_content = re.sub(r'(\| 分析人 \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
-            else:
-                report_content = re.sub(r'(\| Analyst \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
-            
-            # 移除所有星号
-            report_content = re.sub(r'\*+', '', report_content)
-            
-            if lang == "zh":
-                st.session_state.report_content_zh = report_content
-            else:
-                st.session_state.report_content_en = report_content
-            st.rerun()
-        except Exception as e:
-            st.error(f"{t['error_prefix']}{e}")
+            # 访客模式，允许生成但有限制
+            can_generate = True
+        if can_generate:
+            with spinner_placeholder.container():
+                with st.spinner(t["generating"]):
+                    try:
+                        # 构建分析人信息
+                        if analyst_name:
+                            if analyst_title:
+                                analyst_info = f"{analyst_name} ({analyst_title})"
+                            else:
+                                analyst_info = analyst_name
+                        else:
+                            analyst_info = "AI 分析师（基于行业数据库）" if lang == "zh" else "AI Analyst (based on industry database)"
+                        
+                        client = openai.OpenAI(
+                            api_key=st.session_state.ai_api_key,
+                            base_url=st.session_state.ai_base_url,
+                        )
+                        prompt_template = t["report_prompt"]
+                        target_markets_str = ", ".join(target_markets)
+                        prompt = prompt_template.format(
+                            product_name=product_name,
+                            product_description=product_description or "未提供",
+                            target_markets=target_markets_str,
+                            target_users=target_users or "未提供",
+                            channel_status=channel_status,
+                            channel_detail=channel_detail or "未提供",
+                            brand_status=brand_status
+                        )
+                        response = client.chat.completions.create(
+                            model=st.session_state.ai_model_name,
+                            messages=[{"role": "user", "content": prompt}],
+                            temperature=0.7,
+                        )
+                        report_content = response.choices[0].message.content
+                        
+                        # 获取当前日期
+                        if lang == "zh":
+                            current_date = datetime.now().strftime("%Y年%m月%d日")
+                            report_content = re.sub(r'\d{4}年\d{1,2}月\d{1,2}日', current_date, report_content)
+                            report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
+                        else:
+                            current_date = datetime.now().strftime("%B %d, %Y")
+                            report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
+                            report_content = re.sub(r'[A-Z][a-z]+ \d{1,2}, \d{4}', current_date, report_content)
+                        
+                        # 替换占位符
+                        report_content = report_content.replace("{{CURRENT_DATE}}", current_date)
+                        report_content = report_content.replace("{{ANALYST_INFO}}", analyst_info)
+                        
+                        # 强制替换分析人表格行
+                        if lang == "zh":
+                            report_content = re.sub(r'(\| 分析人 \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
+                        else:
+                            report_content = re.sub(r'(\| Analyst \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
+                        
+                        # 移除所有星号
+                        report_content = re.sub(r'\*+', '', report_content)
+                        
+                        if lang == "zh":
+                            st.session_state.report_content_zh = report_content
+                        else:
+                            st.session_state.report_content_en = report_content
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"{t['error_prefix']}{e}")
 
 # ================== 显示报告 ==================
 current_report = None
