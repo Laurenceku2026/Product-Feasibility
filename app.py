@@ -145,7 +145,7 @@ def get_remaining_info(report_key):
     return str(remaining), expiry_str
 
 def is_premium_user(report_key):
-    """高级用户：输入了有效授权码（包括试用版）或管理员"""
+    """高级用户：输入了有效授权码（任何类型）或管理员"""
     if st.session_state.admin_logged_in:
         return True
     if report_key and report_key in REPORT_KEYS:
@@ -223,7 +223,7 @@ def add_dynamic_watermark(lang, hide):
     </div>
     """, unsafe_allow_html=True)
 
-# ================== Word 表格生成（固定列宽，浅灰边框） ==================
+# ================== Word 表格生成（自动列宽，浅灰边框） ==================
 def set_cell_border(cell, border_color=RGBColor(0xCC, 0xCC, 0xCC)):
     tc = cell._tc
     tcPr = tc.get_or_add_tcPr()
@@ -237,6 +237,7 @@ def set_cell_border(cell, border_color=RGBColor(0xCC, 0xCC, 0xCC)):
         tcPr.append(border)
 
 def markdown_to_docx(md_text, doc):
+    """解析 Markdown 文本并写入 Word 文档（支持标题、段落、表格）"""
     lines = md_text.split('\n')
     i = 0
     while i < len(lines):
@@ -275,9 +276,7 @@ def markdown_to_docx(md_text, doc):
                 if num_cols > 0:
                     table = doc.add_table(rows=1+len(data_lines), cols=num_cols)
                     table.style = 'Table Grid'
-                    # 设置固定列宽（每列 1.5 英寸）
-                    for col in table.columns:
-                        col.width = Inches(1.5)
+                    # 不设置固定列宽，让 Word 根据内容自动调整
                     for row in table.rows:
                         for cell in row.cells:
                             set_cell_border(cell, RGBColor(0xCC, 0xCC, 0xCC))
@@ -369,9 +368,8 @@ with col4:
             admin_settings_dialog()
         else:
             admin_login_dialog()
-            # ================== 语言文本 ==================
-# 由于内容太长，此处提供完整的中英文 TEXTS 字典（包含删除了 ** 的 prompt）
-# 注意：以下 TEXTS 已优化，表格中不再出现 ** 标记，并严格要求 AI 输出纯文本表格。
+            # ================== 语言文本（删除了 ** 的 prompt） ==================
+# 注意：此处 TEXTS 字典内容完整，请直接使用
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -852,17 +850,14 @@ if submitted:
     elif not st.session_state.ai_api_key:
         st.error(t["api_key_missing"])
     else:
-        # 检查授权（如果输入了授权码，需要验证次数/有效期；未输入授权码也允许生成，但有限制）
         can_generate = True
         if st.session_state.admin_logged_in:
             can_generate = True
         elif report_key_input and report_key_input in REPORT_KEYS:
-            # 有授权码，检查次数和有效期
             if not consume_usage(report_key_input):
                 st.error(t["trial_ended"])
                 can_generate = False
         else:
-            # 未输入授权码，允许生成（试用模式）
             can_generate = True
         if can_generate:
             with st.spinner(t["generating"]):
@@ -906,10 +901,7 @@ else:
     current_report = st.session_state.report_content_en
 
 if current_report:
-    # 判断是否为高级用户（有有效授权码或管理员）
     premium = is_premium_user(report_key_input)
-    # 高级用户：无水印、可复制、可下载
-    # 非高级用户（未输入授权码）：水印、不可复制、不可下载
     add_security_css(disable=premium)
     show_watermark = not premium
     add_dynamic_watermark(lang, hide=not show_watermark)
