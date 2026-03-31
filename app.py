@@ -2,6 +2,7 @@ import streamlit as st
 import openai
 import json
 import os
+import re
 from io import BytesIO
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
@@ -113,7 +114,7 @@ def activate_license(report_key):
 def consume_usage(report_key):
     if st.session_state.admin_logged_in:
         return True
-    if report_key not in REPORT_KEYS:
+    if not report_key or report_key not in REPORT_KEYS:
         return False
     if report_key not in st.session_state.usage_db:
         success, _, _, _ = activate_license(report_key)
@@ -133,7 +134,7 @@ def consume_usage(report_key):
 def get_remaining_info(report_key):
     if st.session_state.admin_logged_in:
         return "无限", "永久"
-    if report_key not in REPORT_KEYS:
+    if not report_key or report_key not in REPORT_KEYS:
         return "未授权", "无"
     if report_key not in st.session_state.usage_db:
         return "未激活", "无"
@@ -143,31 +144,15 @@ def get_remaining_info(report_key):
     expiry_str = expiry.strftime("%Y-%m-%d")
     return str(remaining), expiry_str
 
-def is_licensed_user(report_key):
-    """判断是否为已输入有效授权码的用户（包括试用版和付费版）"""
+def is_premium_user(report_key):
+    """高级用户：输入了有效授权码（包括试用版）或管理员"""
+    if st.session_state.admin_logged_in:
+        return True
     if report_key and report_key in REPORT_KEYS:
         return True
     return False
 
-def is_premium_user(report_key):
-    """判断是否为付费版用户（非试用版）"""
-    if st.session_state.admin_logged_in:
-        return True
-    if report_key in REPORT_KEYS:
-        lic_type = REPORT_KEYS[report_key]
-        return lic_type != "trial"
-    return False
-
-def is_trial_user(report_key):
-    """判断是否为试用版用户"""
-    if st.session_state.admin_logged_in:
-        return False
-    if report_key in REPORT_KEYS:
-        lic_type = REPORT_KEYS[report_key]
-        return lic_type == "trial"
-    return False
-
-# ================== 防复制/截屏 CSS + 动态水印（条件加载） ==================
+# ================== 防复制/截屏 CSS + 动态水印 ==================
 def add_security_css(disable=False):
     if disable:
         return
@@ -238,7 +223,7 @@ def add_dynamic_watermark(lang, hide):
     </div>
     """, unsafe_allow_html=True)
 
-# ================== 将 Markdown 表格转换为 Word 表格 ==================
+# ================== Word 表格生成（固定列宽，浅灰边框） ==================
 def set_cell_border(cell, border_color=RGBColor(0xCC, 0xCC, 0xCC)):
     tc = cell._tc
     tcPr = tc.get_or_add_tcPr()
@@ -251,7 +236,7 @@ def set_cell_border(cell, border_color=RGBColor(0xCC, 0xCC, 0xCC)):
         border.set(qn('w:color'), f'{border_color}')
         tcPr.append(border)
 
-def markdown_to_docx(md_text, doc, lang):
+def markdown_to_docx(md_text, doc):
     lines = md_text.split('\n')
     i = 0
     while i < len(lines):
@@ -290,6 +275,9 @@ def markdown_to_docx(md_text, doc, lang):
                 if num_cols > 0:
                     table = doc.add_table(rows=1+len(data_lines), cols=num_cols)
                     table.style = 'Table Grid'
+                    # 设置固定列宽（每列 1.5 英寸）
+                    for col in table.columns:
+                        col.width = Inches(1.5)
                     for row in table.rows:
                         for cell in row.cells:
                             set_cell_border(cell, RGBColor(0xCC, 0xCC, 0xCC))
@@ -381,11 +369,9 @@ with col4:
             admin_settings_dialog()
         else:
             admin_login_dialog()
-            # ================== 语言文本 TEXTS ==================
-# 注意：这里包含完整的中英文 prompt，由于长度限制，我们只给出框架，实际使用时需要你从之前的备份中复制完整内容。
-# 为了避免错误，请确保 TEXTS 字典中的 "report_prompt" 包含正确的 Markdown 模板。
-# 如果你没有备份，可以使用下面的简化版（但不会生成完整格式的报告）。强烈建议从你之前可用的代码中复制完整的 TEXTS。
-
+            # ================== 语言文本 ==================
+# 由于内容太长，此处提供完整的中英文 TEXTS 字典（包含删除了 ** 的 prompt）
+# 注意：以下 TEXTS 已优化，表格中不再出现 ** 标记，并严格要求 AI 输出纯文本表格。
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -399,8 +385,8 @@ TEXTS = {
         "api_status": "AI API 状态",
         "api_configured": "✅ 已配置",
         "api_not_configured": "❌ 未配置，请联系管理员",
-        "report_key_label": "授权码 (可选)",
-        "report_key_help": "输入授权码可解除限制并激活完整功能",
+        "report_key_label": "授权码 (Report Key)",
+        "report_key_help": "输入授权码可获得完整权限",
         "license_info": "授权信息",
         "remaining_label": "剩余次数",
         "expiry_label": "有效期至",
@@ -446,11 +432,14 @@ TEXTS = {
         "back_btn": "← 返回重新填写",
         "footer": "© 2026 Laurence Ku | AI产品可行性分析系统 | 基于25年研发管理经验",
         "trial_ended": "试用已结束，请联系 nc.ku@hotmail.com",
-        "no_license": "请输入有效的授权码以激活完整功能。",
+        "no_license": "未输入授权码，当前为试用模式（有水印、不可复制、不可下载）",
         "report_prompt": """
 你是一位资深产品分析师和研发顾问，拥有25年消费电子及智能硬件行业经验。请根据以下产品信息，生成一份专业的《产品可行性分析报告》。
 
-报告必须严格按照以下Markdown结构输出，内容要具体、有洞察，数据基于行业常识合理推断。**重要：表格必须使用标准Markdown表格语法，即使用竖线分隔单元格，第二行为分隔行（例如 |---|---|），不要添加任何反斜杠转义字符。**
+报告必须严格按照以下Markdown结构输出，内容要具体、有洞察，数据基于行业常识合理推断。重要要求：
+1. 表格必须使用标准Markdown表格语法，即使用竖线分隔单元格，第二行为分隔行（例如 |---|---|）。
+2. 禁止在表格内外使用任何加粗标记（如 ** 或 *），也不要使用斜体。所有文本保持纯文本格式。
+3. 禁止在表格单元格内使用换行符或复杂格式。
 
 # 《产品可行性分析报告》
 ## {product_name}
@@ -583,8 +572,8 @@ TEXTS = {
         "api_status": "AI API Status",
         "api_configured": "✅ Configured",
         "api_not_configured": "❌ Not configured, contact admin",
-        "report_key_label": "License Key (Optional)",
-        "report_key_help": "Enter license key to remove restrictions and activate full features",
+        "report_key_label": "Report Key",
+        "report_key_help": "Enter the license key to get full access",
         "license_info": "License Info",
         "remaining_label": "Remaining uses",
         "expiry_label": "Valid until",
@@ -626,15 +615,18 @@ TEXTS = {
         "report_title": "📄 Generated Feasibility Analysis Report",
         "download_section": "📥 Download Report",
         "download_btn": "Download Word Document",
-        "key_error": "Invalid or expired license key",
+        "key_error": "Invalid or expired Report Key",
         "back_btn": "← Back to re-enter",
         "footer": "© 2026 Laurence Ku | AI Product Feasibility System | Based on 25+ years R&D experience",
         "trial_ended": "Trial finished, please contact nc.ku@hotmail.com",
-        "no_license": "Please enter a valid license key to activate full features.",
+        "no_license": "No Report Key entered. Trial mode (watermark, no copy, no download).",
         "report_prompt": """
 You are a senior product analyst and R&D consultant with 25 years of experience in consumer electronics and smart hardware. Based on the following product information, generate a professional "Product Feasibility Analysis Report".
 
-The report must strictly follow the Markdown structure below. The content should be specific, insightful, and based on industry common sense. **Important: Tables must use standard Markdown table syntax (e.g., | Header | Header |, |---|---|). Do not add any backslash escape characters.**
+The report must strictly follow the Markdown structure below. The content should be specific, insightful, and based on industry common sense. Important requirements:
+1. Tables must use standard Markdown table syntax (e.g., | Header | Header |, |---|---|).
+2. Do not use any bold or italic markers (like ** or *) inside or outside tables. Keep all text plain.
+3. Do not use line breaks or complex formatting inside table cells.
 
 # Product Feasibility Analysis Report
 ## {product_name}
@@ -766,7 +758,6 @@ st.markdown("---")
 
 # ================== 侧边栏 ==================
 with st.sidebar:
-    # 授权码输入（可选）
     report_key_input = st.text_input(
         t["report_key_label"],
         value=st.session_state.current_report_key,
@@ -775,7 +766,6 @@ with st.sidebar:
         on_change=lambda: setattr(st.session_state, 'current_report_key', st.session_state.report_key_widget)
     )
     if report_key_input:
-        st.session_state.current_report_key = report_key_input
         valid, remaining, expiry_str, lic_type = activate_license(report_key_input)
         if valid:
             st.success(f"授权成功！剩余 {remaining} 次，有效期至 {expiry_str[:10]}")
@@ -790,7 +780,7 @@ with st.sidebar:
             st.write(f"{t['remaining_label']}: {remaining_str}")
             st.write(f"{t['expiry_label']}: {expiry_str}")
         else:
-            st.info("未输入授权码：生成报告有水印且无法复制/下载")
+            st.warning(t["no_license"])
     st.markdown("---")
     st.markdown(t["contact_info"])
     st.markdown("---")
@@ -850,7 +840,6 @@ with col6:
 st.markdown(f"#### {t['other_info']}")
 additional_info = st.text_area("", placeholder=t["other_ph"], height=80)
 
-# ================== 提交按钮 ==================
 st.markdown("---")
 col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
 with col_btn2:
@@ -863,21 +852,19 @@ if submitted:
     elif not st.session_state.ai_api_key:
         st.error(t["api_key_missing"])
     else:
-        # 检查是否授权（如果输入了授权码则验证，否则视为未授权访客）
-        authorized = False
-        if report_key_input and report_key_input in REPORT_KEYS:
-            # 有授权码，消耗次数
-            allowed = consume_usage(report_key_input)
-            if not allowed:
+        # 检查授权（如果输入了授权码，需要验证次数/有效期；未输入授权码也允许生成，但有限制）
+        can_generate = True
+        if st.session_state.admin_logged_in:
+            can_generate = True
+        elif report_key_input and report_key_input in REPORT_KEYS:
+            # 有授权码，检查次数和有效期
+            if not consume_usage(report_key_input):
                 st.error(t["trial_ended"])
-            else:
-                authorized = True
+                can_generate = False
         else:
-            # 未输入授权码，视为访客，不消耗次数，可以生成报告但有限制
-            authorized = False
-        
-        if authorized or not report_key_input:
-            # 生成报告（无论是否授权，只要没有因为次数/有效期阻止）
+            # 未输入授权码，允许生成（试用模式）
+            can_generate = True
+        if can_generate:
             with st.spinner(t["generating"]):
                 try:
                     client = openai.OpenAI(
@@ -901,6 +888,8 @@ if submitted:
                         temperature=0.7,
                     )
                     report_content = response.choices[0].message.content
+                    # 移除所有星号（避免出现 ** 等）
+                    report_content = re.sub(r'\*+', '', report_content)
                     if lang == "zh":
                         st.session_state.report_content_zh = report_content
                     else:
@@ -908,9 +897,6 @@ if submitted:
                     st.rerun()
                 except Exception as e:
                     st.error(f"{t['error_prefix']}{e}")
-        else:
-            # 授权失败（次数用完或过期）
-            pass
 
 # ================== 显示报告 ==================
 current_report = None
@@ -920,42 +906,21 @@ else:
     current_report = st.session_state.report_content_en
 
 if current_report:
-    # 判断用户权限
-    has_full_access = False
-    if st.session_state.admin_logged_in:
-        has_full_access = True
-    elif report_key_input and report_key_input in REPORT_KEYS:
-        lic_type = REPORT_KEYS[report_key_input]
-        # 付费版（非试用版）或管理员拥有完整权限
-        if lic_type != "trial":
-            has_full_access = True
-        else:
-            # 试用版有完整权限吗？根据你的需求，试用版也应有完整权限（只是次数限制），但为了安全，我们设为试用版也有完整权限
-            # 注意：之前我们说试用版有水印不能复制，但根据最新要求“其他所有用户只要输入授权码，都没有水印和可以copy网页与下载”
-            # 所以试用版也应该无限制。因此这里统一：只要输入有效授权码（包括试用版），就给予完整权限。
-            has_full_access = True
-    else:
-        has_full_access = False
-    
-    if has_full_access:
-        # 无限制：无安全CSS、无水印、可下载
-        add_security_css(disable=True)
-        add_dynamic_watermark(lang, hide=True)
-        can_download = True
-    else:
-        # 访客模式：有限制
-        add_security_css(disable=False)
-        add_dynamic_watermark(lang, hide=False)
-        can_download = False
-    
+    # 判断是否为高级用户（有有效授权码或管理员）
+    premium = is_premium_user(report_key_input)
+    # 高级用户：无水印、可复制、可下载
+    # 非高级用户（未输入授权码）：水印、不可复制、不可下载
+    add_security_css(disable=premium)
+    show_watermark = not premium
+    add_dynamic_watermark(lang, hide=not show_watermark)
     st.markdown(f"## {t['report_title']}")
     st.markdown(current_report, unsafe_allow_html=True)
     
     st.markdown("---")
     st.markdown(f"### {t['download_section']}")
-    if can_download:
+    if premium:
         doc = Document()
-        markdown_to_docx(current_report, doc, lang)
+        markdown_to_docx(current_report, doc)
         doc_bytes = BytesIO()
         doc.save(doc_bytes)
         doc_bytes.seek(0)
@@ -966,7 +931,7 @@ if current_report:
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
     else:
-        st.warning("如需下载报告，请联系 nc.ku@hotmail.com 获取授权码。")
+        st.warning("请联系 nc.ku@hotmail.com 获取完整报告。")
     
     if st.button(t["back_btn"]):
         if lang == "zh":
