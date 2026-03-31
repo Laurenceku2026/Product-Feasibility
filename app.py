@@ -351,8 +351,8 @@ def admin_settings_dialog():
     st.subheader("永久修改 API Key")
     st.markdown("请前往 [Streamlit Cloud Secrets](https://share.streamlit.io/) 修改 `AI_API_KEY` 和 `AI_BASE_URL`，然后重启应用。")
 
-# ================== 右上角按钮（仅保留中英文切换） ==================
-col1, col2, col3 = st.columns([9, 1, 1])
+# ================== 右上角按钮 ==================
+col1, col2, col3, col4 = st.columns([8, 1, 1, 1])
 with col2:
     if st.button("中文", key="zh_btn"):
         st.session_state.lang = "zh"
@@ -361,7 +361,13 @@ with col3:
     if st.button("English", key="en_btn"):
         st.session_state.lang = "en"
         st.rerun()
-        # ================== 语言文本 ==================
+with col4:
+    if st.button("⚙️", key="settings_btn"):
+        if st.session_state.admin_logged_in:
+            admin_settings_dialog()
+        else:
+            admin_login_dialog()
+            # ================== 语言文本 ==================
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -746,16 +752,8 @@ t = TEXTS[lang]
 st.title(t["title"])
 st.markdown("---")
 
-# ================== 侧边栏（添加管理员登录入口） ==================
+# ================== 侧边栏 ==================
 with st.sidebar:
-    # 管理员登录按钮
-    if st.button("🔐 管理员登录"):
-        admin_login_dialog()
-    if st.session_state.admin_logged_in:
-        st.success("✅ 管理员已登录")
-        if st.button("⚙️ 系统设置"):
-            admin_settings_dialog()
-    
     report_key_input = st.text_input(
         t["report_key_label"],
         value=st.session_state.current_report_key,
