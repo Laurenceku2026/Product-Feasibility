@@ -145,7 +145,6 @@ def get_remaining_info(report_key):
     return str(remaining), expiry_str
 
 def is_premium_user(report_key):
-    """高级用户：输入了有效授权码（任何类型）或管理员"""
     if st.session_state.admin_logged_in:
         return True
     if report_key and report_key in REPORT_KEYS:
@@ -237,7 +236,6 @@ def set_cell_border(cell, border_color=RGBColor(0xCC, 0xCC, 0xCC)):
         tcPr.append(border)
 
 def markdown_to_docx(md_text, doc):
-    """解析 Markdown 文本并写入 Word 文档（支持标题、段落、表格）"""
     lines = md_text.split('\n')
     i = 0
     while i < len(lines):
@@ -369,7 +367,7 @@ with col4:
             admin_settings_dialog()
         else:
             admin_login_dialog()
-            # ================== 语言文本 ==================
+            # ================== 语言文本（使用占位符 {{CURRENT_DATE}} 和 {{ANALYST_INFO}}） ==================
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -450,8 +448,8 @@ TEXTS = {
 | 产品描述 | {product_description} |
 | 目标市场 | {target_markets} |
 | 目标用户 | {target_users} |
-| 报告日期 | 自动生成 |
-| 分析人 | {analyst_info} |
+| 报告日期 | {{CURRENT_DATE}} |
+| 分析人 | {{ANALYST_INFO}} |
 
 ---
 
@@ -637,8 +635,8 @@ The report must strictly follow the Markdown structure below. The content should
 | Product Description | {product_description} |
 | Target Markets | {target_markets} |
 | Target Users | {target_users} |
-| Report Date | Auto-generated |
-| Analyst | {analyst_info} |
+| Report Date | {{CURRENT_DATE}} |
+| Analyst | {{ANALYST_INFO}} |
 
 ---
 
@@ -838,11 +836,14 @@ with col6:
 st.markdown(f"#### {t['other_info']}")
 additional_info = st.text_area("", placeholder=t["other_ph"], height=80)
 
-# ================== 提交按钮 ==================
+# ================== 提交按钮（下方放置 spinner 容器） ==================
 st.markdown("---")
 col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
 with col_btn2:
     submitted = st.button(t["submit_btn"], type="primary", use_container_width=True)
+
+# 创建一个空容器，用于放置 spinner（确保显示在按钮下方）
+spinner_placeholder = st.empty()
 
 # ================== 报告生成逻辑 ==================
 if submitted:
@@ -861,57 +862,60 @@ if submitted:
         else:
             can_generate = True
         if can_generate:
-            with st.spinner(t["generating"]):  # 这个 spinner 会显示在按钮下方
-                try:
-                    # 构建分析人信息
-                    if analyst_name:
-                        if analyst_title:
-                            analyst_info = f"{analyst_name} ({analyst_title})"
+            with spinner_placeholder.container():
+                with st.spinner(t["generating"]):
+                    try:
+                        # 构建分析人信息
+                        if analyst_name:
+                            if analyst_title:
+                                analyst_info = f"{analyst_name} ({analyst_title})"
+                            else:
+                                analyst_info = analyst_name
                         else:
-                            analyst_info = analyst_name
-                    else:
-                        analyst_info = "AI 分析师（基于行业数据库）" if lang == "zh" else "AI Analyst (based on industry database)"
-                    
-                    client = openai.OpenAI(
-                        api_key=st.session_state.ai_api_key,
-                        base_url=st.session_state.ai_base_url,
-                    )
-                    prompt_template = t["report_prompt"]
-                    target_markets_str = ", ".join(target_markets)
-                    prompt = prompt_template.format(
-                        product_name=product_name,
-                        product_description=product_description or "未提供",
-                        target_markets=target_markets_str,
-                        target_users=target_users or "未提供",
-                        channel_status=channel_status,
-                        channel_detail=channel_detail or "未提供",
-                        brand_status=brand_status,
-                        analyst_info=analyst_info
-                    )
-                    response = client.chat.completions.create(
-                        model="deepseek-chat",
-                        messages=[{"role": "user", "content": prompt}],
-                        temperature=0.7,
-                    )
-                    report_content = response.choices[0].message.content
-                    
-                    # 替换日期
-                    if lang == "zh":
-                        current_date = datetime.now().strftime("%Y年%m月%d日")
-                    else:
-                        current_date = datetime.now().strftime("%B %d, %Y")
-                    report_content = report_content.replace("自动生成", current_date)
-                    
-                    # 移除所有星号
-                    report_content = re.sub(r'\*+', '', report_content)
-                    
-                    if lang == "zh":
-                        st.session_state.report_content_zh = report_content
-                    else:
-                        st.session_state.report_content_en = report_content
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"{t['error_prefix']}{e}")
+                            analyst_info = "AI 分析师（基于行业数据库）" if lang == "zh" else "AI Analyst (based on industry database)"
+                        
+                        client = openai.OpenAI(
+                            api_key=st.session_state.ai_api_key,
+                            base_url=st.session_state.ai_base_url,
+                        )
+                        prompt_template = t["report_prompt"]
+                        target_markets_str = ", ".join(target_markets)
+                        prompt = prompt_template.format(
+                            product_name=product_name,
+                            product_description=product_description or "未提供",
+                            target_markets=target_markets_str,
+                            target_users=target_users or "未提供",
+                            channel_status=channel_status,
+                            channel_detail=channel_detail or "未提供",
+                            brand_status=brand_status
+                        )
+                        response = client.chat.completions.create(
+                            model="deepseek-chat",
+                            messages=[{"role": "user", "content": prompt}],
+                            temperature=0.7,
+                        )
+                        report_content = response.choices[0].message.content
+                        
+                        # 替换日期占位符
+                        if lang == "zh":
+                            current_date = datetime.now().strftime("%Y年%m月%d日")
+                        else:
+                            current_date = datetime.now().strftime("%B %d, %Y")
+                        report_content = report_content.replace("{{CURRENT_DATE}}", current_date)
+                        
+                        # 替换分析人占位符
+                        report_content = report_content.replace("{{ANALYST_INFO}}", analyst_info)
+                        
+                        # 移除所有星号
+                        report_content = re.sub(r'\*+', '', report_content)
+                        
+                        if lang == "zh":
+                            st.session_state.report_content_zh = report_content
+                        else:
+                            st.session_state.report_content_en = report_content
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"{t['error_prefix']}{e}")
 
 # ================== 显示报告 ==================
 current_report = None
