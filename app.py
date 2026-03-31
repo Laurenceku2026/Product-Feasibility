@@ -78,7 +78,7 @@ if "ai_base_url" not in st.session_state:
 if "usage_db" not in st.session_state:
     st.session_state.usage_db = load_usage_data()
 if "current_license_type" not in st.session_state:
-    st.session_state.current_license_type = None  # 'trial', 'level1', etc.
+    st.session_state.current_license_type = None
 
 def activate_license(report_key):
     if report_key in REPORT_KEYS:
@@ -141,7 +141,7 @@ def get_remaining_info(report_key):
     return str(remaining), expiry_str
 
 def is_premium_user(report_key):
-    """判断是否为高级用户（非试用版）"""
+    """判断是否为高级用户（非试用版 或 管理员）"""
     if st.session_state.admin_logged_in:
         return True
     if report_key in REPORT_KEYS:
@@ -228,7 +228,6 @@ def markdown_to_docx(md_text, doc):
     i = 0
     while i < len(lines):
         line = lines[i]
-        # 标题
         if line.startswith('# '):
             doc.add_heading(line[2:], level=1)
             i += 1
@@ -241,51 +240,38 @@ def markdown_to_docx(md_text, doc):
             doc.add_heading(line[4:], level=3)
             i += 1
             continue
-        # 表格：以 | 开头，且下一行也是以 | 开头或包含 |- 分隔符
         if line.startswith('|') and i+1 < len(lines):
-            # 收集表格行
             table_lines = []
             while i < len(lines) and lines[i].startswith('|'):
                 table_lines.append(lines[i].strip())
                 i += 1
-            # 解析表格
             if len(table_lines) >= 2:
-                # 分离表头、分隔行、数据行
-                header_line = table_lines[0]
-                sep_line = table_lines[1] if len(table_lines) > 1 else None
-                data_lines = table_lines[2:] if len(table_lines) > 2 else []
-                # 简单解析：按 | 分割，去除首尾空
                 def parse_row(row):
                     cells = [cell.strip() for cell in row.split('|')]
-                    # 去除首尾空元素
                     if cells and cells[0] == '':
                         cells = cells[1:]
                     if cells and cells[-1] == '':
                         cells = cells[:-1]
                     return cells
-                headers = parse_row(header_line)
-                # 跳过分隔行（包含 --- 的行）
-                if sep_line and '---' in sep_line:
-                    pass
-                # 创建 Word 表格
+                headers = parse_row(table_lines[0])
+                if len(table_lines) > 1 and '---' in table_lines[1]:
+                    data_lines = table_lines[2:] if len(table_lines) > 2 else []
+                else:
+                    data_lines = table_lines[1:]
                 num_cols = len(headers)
                 if num_cols > 0:
                     table = doc.add_table(rows=1+len(data_lines), cols=num_cols)
                     table.style = 'Light Grid Accent 1'
-                    # 填充表头
                     for col_idx, cell_text in enumerate(headers):
                         table.cell(0, col_idx).text = cell_text
-                        # 加粗
                         table.cell(0, col_idx).paragraphs[0].runs[0].bold = True
-                    # 填充数据行
                     for row_idx, data_line in enumerate(data_lines):
                         cells = parse_row(data_line)
                         for col_idx, cell_text in enumerate(cells):
                             if col_idx < num_cols:
                                 table.cell(row_idx+1, col_idx).text = cell_text
-                    doc.add_paragraph()  # 表格后加空行
+                    doc.add_paragraph()
             continue
-        # 普通段落
         if line.strip():
             doc.add_paragraph(line)
         else:
@@ -355,8 +341,7 @@ with col4:
         else:
             admin_login_dialog()
 
-# ================== 语言文本（含完整 prompt，优化表格格式） ==================
-# 注意：prompt 中明确要求使用标准 Markdown 表格格式，不要使用反斜杠转义
+# ================== 语言文本（含完整 prompt，与之前相同） ==================
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -443,37 +428,19 @@ TEXTS = {
 
 ### 1.1 市场规模与趋势
 
-（请根据目标市场分别列出主要市场的规模、增长率、驱动因素和瓶颈，用表格形式，例如：）
-
-| 市场 | 规模 | 年增长率 | 主要驱动因素 | 主要瓶颈 |
-|------|------|----------|--------------|----------|
-| 美国 | ... | ... | ... | ... |
-| 中国 | ... | ... | ... | ... |
+（请根据目标市场分别列出主要市场的规模、增长率、驱动因素和瓶颈，用表格形式）
 
 ### 1.2 用户画像
 
-（用表格描述核心用户特征，例如：）
-
-| 维度 | 描述 |
-|------|------|
-| 核心用户 | ... |
-| 使用场景 | ... |
+（用表格描述核心用户特征）
 
 ### 1.3 用户痛点分析
 
-（列出3-5个核心痛点，用表格说明提及频率和描述，例如：）
-
-| 痛点 | 提及频率 | 说明 |
-|------|----------|------|
-| ... | 高/中/低 | ... |
+（列出3-5个核心痛点，用表格说明提及频率和描述）
 
 ### 1.4 关键功能需求排序
 
-（用表格列出功能、重要性评分和说明，例如：）
-
-| 功能 | 重要性 | 说明 |
-|------|--------|------|
-| ... | 10/10 | ... |
+（用表格列出功能、重要性评分和说明）
 
 ---
 
@@ -481,19 +448,11 @@ TEXTS = {
 
 ### 2.1 主要竞争对手
 
-（根据产品品类，列出至少3个主要竞品，用表格说明品牌、产品、优势、劣势、定价区间，例如：）
-
-| 品牌 | 产品 | 优势 | 劣势 | 定价区间 |
-|------|------|------|------|----------|
-| ... | ... | ... | ... | ... |
+（根据产品品类，列出至少3个主要竞品，用表格说明品牌、产品、优势、劣势、定价区间）
 
 ### 2.2 竞品功能对比
 
-（选择5-6个关键功能进行对比，用表格展示，例如：）
-
-| 功能 | 竞品A | 竞品B | 竞品C | 空白机会 |
-|------|-------|-------|-------|----------|
-| ... | ⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ | ... |
+（选择5-6个关键功能进行对比，用表格展示）
 
 ### 2.3 市场空白点分析
 
@@ -507,10 +466,6 @@ TEXTS = {
 
 （用表格描述主要渠道类型、占比、特点、适合度）
 
-| 渠道类型 | 占比 | 特点 | 适合度评估 |
-|----------|------|------|------------|
-| ... | % | ... | 高/中/低 |
-
 ### 3.2 客户现有渠道现状
 
 （基于用户输入：渠道情况={channel_status}，渠道详情={channel_detail}，品牌认知度={brand_status}，进行分析）
@@ -518,11 +473,6 @@ TEXTS = {
 ### 3.3 渠道策略建议
 
 （按年份给出渠道拓展建议，用表格）
-
-| 阶段 | 渠道策略 | 具体行动 |
-|------|----------|----------|
-| 第1年 | ... | ... |
-| 第2年 | ... | ... |
 
 ---
 
@@ -532,27 +482,13 @@ TEXTS = {
 
 （用表格列出关键技术项、要求、客户现有能力、风险评估）
 
-| 技术项 | 要求 | 客户现有能力 | 风险评估 |
-|--------|------|--------------|----------|
-| ... | ... | ... | 高/中/低 |
-
 ### 4.2 开发周期估算
 
 （用表格列出阶段、时间、关键任务）
 
-| 阶段 | 时间 | 关键任务 |
-|------|------|----------|
-| 概念验证 | 月 | ... |
-| 工程样机 | 月 | ... |
-| 总计 | 月 | |
-
 ### 4.3 关键风险点
 
 （用表格列出风险、可能性、影响、应对措施）
-
-| 风险 | 可能性 | 影响 | 应对措施 |
-|------|--------|------|----------|
-| ... | 高/中/低 | 高/中/低 | ... |
 
 ---
 
@@ -566,20 +502,9 @@ TEXTS = {
 
 （3年预测，用表格）
 
-| 年份 | 营收 | 关键假设 |
-|------|------|----------|
-| 第1年 | 金额 | ... |
-| 第2年 | 金额 | ... |
-
 ### 5.3 投资回报估算
 
 （用表格列出研发投入、市场推广、首批生产成本、总启动资金、毛利率、盈亏平衡点）
-
-| 项目 | 金额 | 说明 |
-|------|------|------|
-| 研发投入 | ... | ... |
-| 总启动资金 | ... | |
-| 毛利率 | % | |
 
 ---
 
@@ -589,17 +514,9 @@ TEXTS = {
 
 （用表格打分：市场吸引力、技术可行性、渠道匹配度、竞争格局、投资回报，各1-10分，并说明）
 
-| 维度 | 评分（1-10） | 说明 |
-|------|--------------|------|
-| 市场吸引力 | 9 | ... |
-
 ### 6.2 差异化定位建议
 
 （给出2-3个定位选项，用表格分析优势和风险）
-
-| 选项 | 定位 | 优势 | 风险 |
-|------|------|------|------|
-| 选项A | ... | ... | ... |
 
 ### 6.3 最终建议
 
@@ -803,8 +720,9 @@ t = TEXTS[lang]
 st.title(t["title"])
 st.markdown("---")
 
-# ================== 侧边栏 ==================
+# ================== 侧边栏（调整顺序：去掉图片，上移“关于分析系统”） ==================
 with st.sidebar:
+    # Report Key 输入框
     report_key_input = st.text_input(t["report_key_label"], type="password", help=t["report_key_help"])
     if report_key_input:
         valid, remaining, expiry_str, lic_type = activate_license(report_key_input)
@@ -823,10 +741,12 @@ with st.sidebar:
         else:
             st.warning(t["no_license"])
     st.markdown("---")
+    
+    # 联系人信息
     st.markdown(t["contact_info"])
     st.markdown("---")
     
-    st.image("https://via.placeholder.com/300x100?text=Laurence+Ku", width=200)
+    # 关于分析系统（上移）
     st.markdown(f"## {t['sidebar_title']}")
     st.markdown(t["sidebar_basis"])
     for item in t["basis_items"]:
@@ -849,7 +769,7 @@ with st.sidebar:
     else:
         st.error(t["api_not_configured"])
 
-# ================== 主表单 ==================
+# ================== 主表单（与之前相同） ==================
 st.markdown(f"### {t['input_title']}")
 col1, col2 = st.columns(2)
 
@@ -896,7 +816,6 @@ if submitted:
     elif not st.session_state.ai_api_key:
         st.error(t["api_key_missing"])
     else:
-        # 检查授权
         if not st.session_state.admin_logged_in:
             if not report_key_input or report_key_input not in REPORT_KEYS:
                 st.error(t["no_license"])
@@ -936,7 +855,6 @@ if submitted:
                         except Exception as e:
                             st.error(f"{t['error_prefix']}{e}")
         else:
-            # 管理员直接生成
             with st.spinner(t["generating"]):
                 try:
                     client = openai.OpenAI(
@@ -968,7 +886,7 @@ if submitted:
                 except Exception as e:
                     st.error(f"{t['error_prefix']}{e}")
 
-# ================== 显示报告（条件加载防复制和水印） ==================
+# ================== 显示报告 ==================
 current_report = None
 if lang == "zh":
     current_report = st.session_state.report_content_zh
@@ -976,9 +894,8 @@ else:
     current_report = st.session_state.report_content_en
 
 if current_report:
-    # 判断是否高级用户（管理员 或 非试用版授权码）
+    # 判断是否高级用户
     premium = is_premium_user(report_key_input) if report_key_input else False
-    # 高级用户：不添加防复制限制，不显示水印；试用版用户：添加限制，显示水印
     add_security_css(disable=premium)
     show_watermark = not (premium or st.session_state.admin_logged_in)
     add_dynamic_watermark(lang, hide=not show_watermark)
@@ -988,7 +905,6 @@ if current_report:
     st.markdown("---")
     st.markdown(f"### {t['download_section']}")
     if report_key_input and report_key_input in REPORT_KEYS:
-        # 生成 Word 文档（使用表格解析）
         doc = Document()
         markdown_to_docx(current_report, doc)
         doc_bytes = BytesIO()
