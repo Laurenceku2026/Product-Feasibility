@@ -65,8 +65,6 @@ def save_usage_data(data):
 # ================== 初始化 session state ==================
 if "lang" not in st.session_state:
     st.session_state.lang = "zh"
-if "pulse_active" not in st.session_state:
-    st.session_state.pulse_active = False
 if "report_content_zh" not in st.session_state:
     st.session_state.report_content_zh = None
 if "report_content_en" not in st.session_state:
@@ -776,22 +774,6 @@ Output the report directly without additional explanation. For information not p
 # ================== 获取当前语言 ==================
 lang = st.session_state.lang
 t = TEXTS[lang]
-
-st.title(t["title"])
-# 如果处于生成状态，添加脉冲动画
-if st.session_state.pulse_active:
-    st.markdown("""
-    <style>
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(0, 123, 255, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0); }
-        }
-        .stButton button {
-            animation: pulse 1.5s infinite;
-        }
-    </style>
-    """, unsafe_allow_html=True)
 st.markdown("---")
 
 # ================== 侧边栏 ==================
@@ -995,9 +977,6 @@ if can_generate:
                 st.rerun()
             except Exception as e:
                 st.error(f"{t['error_prefix']}{e}")
-            # 发生错误时也要关闭脉冲
-                        st.session_state.pulse_active = False
-                        st.error(f"{t['error_prefix']}{e}")
 
 # ================== 显示报告 ==================
 current_report = None
