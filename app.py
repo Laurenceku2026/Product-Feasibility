@@ -65,6 +65,8 @@ def save_usage_data(data):
 # ================== 初始化 session state ==================
 if "lang" not in st.session_state:
     st.session_state.lang = "zh"
+if "pulse_active" not in st.session_state:
+    st.session_state.pulse_active = False
 if "report_content_zh" not in st.session_state:
     st.session_state.report_content_zh = None
 if "report_content_en" not in st.session_state:
@@ -774,6 +776,22 @@ Output the report directly without additional explanation. For information not p
 # ================== 获取当前语言 ==================
 lang = st.session_state.lang
 t = TEXTS[lang]
+
+st.title(t["title"])
+# 如果处于生成状态，添加脉冲动画
+if st.session_state.pulse_active:
+    st.markdown("""
+    <style>
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 123, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0); }
+        }
+        .stButton button {
+            animation: pulse 1.5s infinite;
+        }
+    </style>
+    """, unsafe_allow_html=True)
 st.markdown("---")
 
 # ================== 侧边栏 ==================
@@ -889,94 +907,83 @@ if submitted:
                 can_generate = False
         else:
             can_generate = True
-if can_generate:
-    with spinner_placeholder.container():
-        # 在按钮下方显示旋转图标 + 居中文字
-        st.markdown(f"""
-        <div style="display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 10px;">
-            <div class="custom-spinner"></div>
-            <span>{t["generating"]}</span>
-        </div>
-        <style>
-            .custom-spinner {{
-                width: 20px;
-                height: 20px;
-                border: 2px solid #f3f3f3;
-                border-top: 2px solid #3498db;
-                border-radius: 50%;
-                animation: spin 1s linear infinite;
-            }}
-            @keyframes spin {{
-                0% {{ transform: rotate(0deg); }}
-                100% {{ transform: rotate(360deg); }}
-            }}
-        </style>
-        """, unsafe_allow_html=True)
-        # 使用空文本的 spinner，只显示奔跑小人动画（默认在右上角）
-        with st.spinner(""):
-            try:
-                # ---------- 报告生成代码（完全不变） ----------
-                # 构建分析人信息
-                if analyst_name:
-                    if analyst_title:
-                        analyst_info = f"{analyst_name} ({analyst_title})"
-                    else:
-                        analyst_info = analyst_name
-                else:
-                    analyst_info = "AI 分析师（基于行业数据库）" if lang == "zh" else "AI Analyst (based on industry database)"
-                
-                client = openai.OpenAI(
-                    api_key=st.session_state.ai_api_key,
-                    base_url=st.session_state.ai_base_url,
-                )
-                prompt_template = t["report_prompt"]
-                target_markets_str = ", ".join(target_markets)
-                prompt = prompt_template.format(
-                    product_name=product_name,
-                    product_description=product_description or "未提供",
-                    target_markets=target_markets_str,
-                    target_users=target_users or "未提供",
-                    channel_status=channel_status,
-                    channel_detail=channel_detail or "未提供",
-                    brand_status=brand_status
-                )
-                response = client.chat.completions.create(
-                    model=st.session_state.ai_model_name,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.7,
-                )
-                report_content = response.choices[0].message.content
-                
-                # 获取当前日期
-                if lang == "zh":
-                    current_date = datetime.now().strftime("%Y年%m月%d日")
-                    report_content = re.sub(r'\d{4}年\d{1,2}月\d{1,2}日', current_date, report_content)
-                    report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
-                else:
-                    current_date = datetime.now().strftime("%B %d, %Y")
-                    report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
-                    report_content = re.sub(r'[A-Z][a-z]+ \d{1,2}, \d{4}', current_date, report_content)
-                
-                # 替换占位符
-                report_content = report_content.replace("{{CURRENT_DATE}}", current_date)
-                report_content = report_content.replace("{{ANALYST_INFO}}", analyst_info)
-                
-                # 强制替换分析人表格行
-                if lang == "zh":
-                    report_content = re.sub(r'(\| 分析人 \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
-                else:
-                    report_content = re.sub(r'(\| Analyst \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
-                
-                # 移除所有星号
-                report_content = re.sub(r'\*+', '', report_content)
-                
-                if lang == "zh":
-                    st.session_state.report_content_zh = report_content
-                else:
-                    st.session_state.report_content_en = report_content
-                st.rerun()
-            except Exception as e:
-                st.error(f"{t['error_prefix']}{e}")
+        if can_generate:
+            # 开启脉冲动画
+            st.session_state.pulse_active = True
+            # 注意：这里不需要额外 rerun，因为当前运行中脉冲样式已生效
+            with spinner_placeholder.container():
+                # 在按钮下方显示居中文字
+                st.markdown(f'<div style="text-align: center; margin-top: 10px;">{t["generating"]}</div>', unsafe_allow_html=True)
+                # 使用空文本的 spinner，只显示奔跑小人动画（默认在右上角）
+                with st.spinner(""):
+                    try:
+                        # ---------- 以下为您的报告生成代码（请保持原样） ----------
+                        # 构建分析人信息
+                        if analyst_name:
+                            if analyst_title:
+                                analyst_info = f"{analyst_name} ({analyst_title})"
+                            else:
+                                analyst_info = analyst_name
+                        else:
+                            analyst_info = "AI 分析师（基于行业数据库）" if lang == "zh" else "AI Analyst (based on industry database)"
+                        
+                        client = openai.OpenAI(
+                            api_key=st.session_state.ai_api_key,
+                            base_url=st.session_state.ai_base_url,
+                        )
+                        prompt_template = t["report_prompt"]
+                        target_markets_str = ", ".join(target_markets)
+                        prompt = prompt_template.format(
+                            product_name=product_name,
+                            product_description=product_description or "未提供",
+                            target_markets=target_markets_str,
+                            target_users=target_users or "未提供",
+                            channel_status=channel_status,
+                            channel_detail=channel_detail or "未提供",
+                            brand_status=brand_status
+                        )
+                        response = client.chat.completions.create(
+                            model=st.session_state.ai_model_name,
+                            messages=[{"role": "user", "content": prompt}],
+                            temperature=0.7,
+                        )
+                        report_content = response.choices[0].message.content
+                        
+                        # 获取当前日期
+                        if lang == "zh":
+                            current_date = datetime.now().strftime("%Y年%m月%d日")
+                            report_content = re.sub(r'\d{4}年\d{1,2}月\d{1,2}日', current_date, report_content)
+                            report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
+                        else:
+                            current_date = datetime.now().strftime("%B %d, %Y")
+                            report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
+                            report_content = re.sub(r'[A-Z][a-z]+ \d{1,2}, \d{4}', current_date, report_content)
+                        
+                        # 替换占位符
+                        report_content = report_content.replace("{{CURRENT_DATE}}", current_date)
+                        report_content = report_content.replace("{{ANALYST_INFO}}", analyst_info)
+                        
+                        # 强制替换分析人表格行
+                        if lang == "zh":
+                            report_content = re.sub(r'(\| 分析人 \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
+                        else:
+                            report_content = re.sub(r'(\| Analyst \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
+                        
+                        # 移除所有星号
+                        report_content = re.sub(r'\*+', '', report_content)
+                        
+                        if lang == "zh":
+                            st.session_state.report_content_zh = report_content
+                        else:
+                            st.session_state.report_content_en = report_content
+                        
+                        # 关闭脉冲动画并刷新页面显示报告
+                        st.session_state.pulse_active = False
+                        st.rerun()
+                    except Exception as e:
+                        # 发生错误时也要关闭脉冲
+                        st.session_state.pulse_active = False
+                        st.error(f"{t['error_prefix']}{e}")
 
 # ================== 显示报告 ==================
 current_report = None
