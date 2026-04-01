@@ -891,6 +891,7 @@ with col_btn2:
 spinner_placeholder = st.empty()
 
 # ================== 报告生成逻辑 ==================
+# ================== 报告生成逻辑 ==================
 if submitted:
     if not product_name:
         st.error(t["product_name_missing"])
@@ -907,12 +908,16 @@ if submitted:
         else:
             can_generate = True
         if can_generate:
+            # 开启脉冲动画
+            st.session_state.pulse_active = True
+            # 注意：这里不需要额外 rerun，因为当前运行中脉冲样式已生效
             with spinner_placeholder.container():
-                # 在按钮下方显示居中文字（保留脉冲动画）
+                # 在按钮下方显示居中文字
                 st.markdown(f'<div style="text-align: center; margin-top: 10px;">{t["generating"]}</div>', unsafe_allow_html=True)
                 # 使用空文本的 spinner，只显示奔跑小人动画（默认在右上角）
                 with st.spinner(""):
                     try:
+                        # ---------- 以下为您的报告生成代码（请保持原样） ----------
                         # 构建分析人信息
                         if analyst_name:
                             if analyst_title:
@@ -971,8 +976,13 @@ if submitted:
                             st.session_state.report_content_zh = report_content
                         else:
                             st.session_state.report_content_en = report_content
+                        
+                        # 关闭脉冲动画并刷新页面显示报告
+                        st.session_state.pulse_active = False
                         st.rerun()
                     except Exception as e:
+                        # 发生错误时也要关闭脉冲
+                        st.session_state.pulse_active = False
                         st.error(f"{t['error_prefix']}{e}")
 
 # ================== 显示报告 ==================
