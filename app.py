@@ -450,7 +450,7 @@ TEXTS = {
         "remaining_label": "剩余次数",
         "expiry_label": "有效期至",
         "contact_info": "📞 **联系人：古生**  \n✉️ 电邮: nc.ku@hotmail.com  \n📱 电话/微信: +86-13823760640",
-        "purchase_title": "💰 购买报告次数",
+        "purchase_title": "💰 购买+解锁",
         "input_title": "📝 产品信息输入",
         "basic_info": "基本信息",
         "product_name": "产品名称",
@@ -638,7 +638,7 @@ TEXTS = {
         "remaining_label": "Remaining uses",
         "expiry_label": "Valid until",
         "contact_info": "📞 **Contact: Laurence Ku**  \n✉️ Email: nc.ku@hotmail.com  \n📱 Phone/Wechat: +86-13823760640",
-        "purchase_title": "💰 Purchase Credits",
+        "purchase_title": "💰 Purchase + Unlock",
         "input_title": "📝 Product Information Input",
         "basic_info": "Basic Information",
         "product_name": "Product Name",
@@ -839,12 +839,24 @@ if "order_success" in params and "plan" in params:
     
     if uses > 0:
         new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
-        st.success(f"✅ 支付成功！您的授权码已生成：")
-        st.code(new_key, language="text")
-        st.write(f"**套餐**：{plan_name}  |  **次数**：{max_uses}  |  **有效期至**：{expiry_str[:10]}")
-        st.info("请复制上方授权码，在左侧边栏输入即可激活高级功能。")
-        # 清除 URL 参数，避免刷新页面重复触发
-        st.query_params.clear()
+        # 将授权码自动填入侧边栏输入框
+        st.session_state.current_report_key = new_key
+        # 显示成功消息，带复制按钮
+        st.success(f"✅ 支付成功！您的授权码已生成并自动填入下方输入框。")
+        # 使用 HTML/JS 实现复制功能
+        copy_js = f"""
+        <div style="background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin-top: 10px;">
+            <code style="font-size: 16px;">{new_key}</code>
+            <button onclick="navigator.clipboard.writeText('{new_key}')" style="margin-left: 10px;">📋 复制授权码</button>
+        </div>
+        <p style="margin-top: 10px;">⚠️ 请务必保存好此授权码，下次使用时可复制粘贴到左侧输入框。</p>
+        """
+        st.markdown(copy_js, unsafe_allow_html=True)
+        st.info("页面即将刷新，授权码将自动生效...")
+        # 延迟刷新，让用户看到消息
+        import time
+        time.sleep(2)
+        st.rerun()
     else:
         st.error("❌ 支付失败或套餐无效，请联系客服。")
         st.query_params.clear()
@@ -925,7 +937,7 @@ with st.sidebar:
     # with col3:
     #     st.link_button("🚀 1200次套餐\n1200元", "https://www.mikecrm.com/你的1200次链接?plan=1200")
     
-    st.info("支付成功后会自动跳回本页面，授权码将立即显示。")
+    st.info("支付成功后会自动跳回本页面，授权码将自动填入并激活。")
     st.markdown("---")
     
     st.markdown(f"## {t['sidebar_title']}")
