@@ -911,12 +911,33 @@ if submitted:
             # 开启脉冲动画
             st.session_state.pulse_active = True
             # 注意：这里不需要额外 rerun，因为当前运行中脉冲样式已生效
-            with spinner_placeholder.container():
-                # 在按钮下方显示居中文字
-                st.markdown(f'<div style="text-align: center; margin-top: 10px;">{t["generating"]}</div>', unsafe_allow_html=True)
-                # 使用空文本的 spinner，只显示奔跑小人动画（默认在右上角）
-                with st.spinner(""):
-                    try:
+with spinner_placeholder.container():
+    # 在按钮下方显示旋转图标 + 居中文字
+    st.markdown(f"""
+    <div style="display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 10px;">
+        <div class="custom-spinner"></div>
+        <span>{t["generating"]}</span>
+    </div>
+    <style>
+        .custom-spinner {{
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }}
+        @keyframes spin {{
+            0% {{ transform: rotate(0deg); }}
+            100% {{ transform: rotate(360deg); }}
+        }}
+    </style>
+    """, unsafe_allow_html=True)
+    # 使用空文本的 spinner，只显示奔跑小人动画（默认在右上角）
+    with st.spinner(""):
+        try:
+            # ... 报告生成代码（保持不变）...
+                                    
                         # ---------- 以下为您的报告生成代码（请保持原样） ----------
                         # 构建分析人信息
                         if analyst_name:
