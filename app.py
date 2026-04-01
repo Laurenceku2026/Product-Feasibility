@@ -5,6 +5,7 @@ import os
 import re
 import secrets
 import string
+import time
 from io import BytesIO
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
@@ -488,6 +489,7 @@ TEXTS = {
         "report_title": "📄 生成的可行性分析报告",
         "download_section": "📥 下载报告",
         "download_btn": "下载 Word 文档",
+        "download_unlock_btn": "📥 下载报告+解锁",
         "key_error": "授权码无效或已过期",
         "back_btn": "← 返回重新填写",
         "footer": "© 2026 Laurence Ku | AI产品可行性分析系统 | 基于25年研发管理经验",
@@ -676,6 +678,7 @@ TEXTS = {
         "report_title": "📄 Generated Feasibility Analysis Report",
         "download_section": "📥 Download Report",
         "download_btn": "Download Word Document",
+        "download_unlock_btn": "📥 Download Report + Unlock",
         "key_error": "Invalid or expired Report Key",
         "back_btn": "← Back to re-enter",
         "footer": "© 2026 Laurence Ku | AI Product Feasibility System | Based on 25+ years R&D experience",
@@ -809,7 +812,6 @@ Output the report directly without additional explanation. For information not p
 """
     }
 }
-
 # ================== 获取当前语言 ==================
 lang = st.session_state.lang
 t = TEXTS[lang]
@@ -853,29 +855,42 @@ if "order_success" in params and "plan" in params:
         """
         st.markdown(copy_js, unsafe_allow_html=True)
         st.info("页面即将刷新，授权码将自动生效...")
-        # 延迟刷新，让用户看到消息
-        import time
         time.sleep(2)
         st.rerun()
     else:
         st.error("❌ 支付失败或套餐无效，请联系客服。")
         st.query_params.clear()
 
-# 如果处于生成状态，添加脉冲动画
-if st.session_state.pulse_active:
+# ================== 支付对话框 ==================
+@st.dialog("购买+解锁")
+def purchase_dialog():
+    st.markdown("### 选择套餐")
     st.markdown("""
-    <style>
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(0, 123, 255, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0); }
-        }
-        .stButton button {
-            animation: pulse 1.5s infinite;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-st.markdown("---")
+| 套餐 | 价格 | 次数 | 有效期 |
+|------|------|------|--------|
+| 单次通行 | 18元 / 3美元 | 1次 | 无限制 |
+| 100次套餐 | 180元 / 30美元 | 100次 | 1个月 |
+| 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
+""")
+    st.markdown("#### 🌍 国际支付（Stripe）")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/你的单次链接?plan=single")
+    with col2:
+        st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/你的100次链接?plan=100")
+    with col3:
+        st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/你的1200次链接?plan=1200")
+    st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
+    st.info("国内支付即将开放，敬请期待。")
+    # 等麦客审核通过后，取消下面的注释并填入实际链接
+    # col_a, col_b, col_c = st.columns(3)
+    # with col_a:
+    #     st.link_button("🎟️ 单次通行\n18元", "https://www.mikecrm.com/你的单次链接?plan=single")
+    # with col_b:
+    #     st.link_button("📦 100次套餐\n180元", "https://www.mikecrm.com/你的100次链接?plan=100")
+    # with col_c:
+    #     st.link_button("🚀 1200次套餐\n1200元", "https://www.mikecrm.com/你的1200次链接?plan=1200")
+    st.markdown("支付成功后会自动跳回本页面，授权码将自动填入并激活。")
 
 # ================== 侧边栏 ==================
 with st.sidebar:
@@ -909,34 +924,25 @@ with st.sidebar:
     st.markdown(t["contact_info"])
     st.markdown("---")
     
-    # ================== 购买引导 ==================
+    # ================== 购买引导（侧边栏） ==================
     st.markdown(f"## {t['purchase_title']}")
-    
-    # 国际支付（Stripe）
+    st.markdown("""
+| 套餐 | 价格 | 次数 | 有效期 |
+|------|------|------|--------|
+| 单次通行 | 18元 / 3美元 | 1次 | 无限制 |
+| 100次套餐 | 180元 / 30美元 | 100次 | 1个月 |
+| 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
+""")
     st.markdown("#### 🌍 国际支付（Stripe）")
     col_s1, col_s2, col_s3 = st.columns(3)
     with col_s1:
-        # 请将下方链接替换为您实际的 Stripe 单次通行支付链接
         st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/你的单次链接?plan=single")
     with col_s2:
-        # 请将下方链接替换为您实际的 Stripe 100次套餐支付链接
         st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/你的100次链接?plan=100")
     with col_s3:
-        # 请将下方链接替换为您实际的 Stripe 1200次套餐支付链接
         st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/你的1200次链接?plan=1200")
-    
-    # 国内支付（麦客）—— 等审核通过后填入实际链接
     st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
     st.info("国内支付即将开放，敬请期待。")
-    # 等麦客审核通过后，取消下面的注释并填入实际链接
-    # col1, col2, col3 = st.columns(3)
-    # with col1:
-    #     st.link_button("🎟️ 单次通行\n18元", "https://www.mikecrm.com/你的单次链接?plan=single")
-    # with col2:
-    #     st.link_button("📦 100次套餐\n180元", "https://www.mikecrm.com/你的100次链接?plan=100")
-    # with col3:
-    #     st.link_button("🚀 1200次套餐\n1200元", "https://www.mikecrm.com/你的1200次链接?plan=1200")
-    
     st.info("支付成功后会自动跳回本页面，授权码将自动填入并激活。")
     st.markdown("---")
     
@@ -1114,6 +1120,7 @@ if current_report:
     st.markdown("---")
     st.markdown(f"### {t['download_section']}")
     if premium:
+        # 已授权用户直接下载
         doc = Document()
         markdown_to_docx(current_report, doc)
         doc_bytes = BytesIO()
@@ -1126,7 +1133,9 @@ if current_report:
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
     else:
-        st.warning("请联系 nc.ku@hotmail.com 获取完整报告。")
+        # 非授权用户显示“下载报告+解锁”按钮，点击后弹出购买对话框
+        if st.button(t["download_unlock_btn"], use_container_width=True):
+            purchase_dialog()
     
     if st.button(t["back_btn"]):
         if lang == "zh":
