@@ -648,11 +648,11 @@ TEXTS = {
         "contact_info": "📞 **Contact: Laurence Ku**  \n✉️ Email: nc.ku@hotmail.com  \n📱 Phone/Wechat: +86-13823760640",
         "purchase_title": "💰 Purchase Report Credits",
         "purchase_table": """
-| Plan | Price | Credits | Validity |
+| Plan | Price | Pass | Validity |
 |------|-------|---------|----------|
 | Single Pass | 18 RMB / $3 | 1 | Unlimited |
-| 100 Credits | 180 RMB / $30 | 100 | 1 month |
-| 1200 Credits | 1200 RMB / $200 | 1200 | 12 months |
+| 100 Pass | 180 RMB / $30 | 100 | 1 month |
+| 1200 Pass | 1200 RMB / $200 | 1200 | 12 months |
 """,
         "purchase_contact": "Please contact us to purchase. After payment, we will generate a license key for you:\n\n📧 nc.ku@hotmail.com\n📱 +86-13823760640",
         "input_title": "📝 Product Information Input",
