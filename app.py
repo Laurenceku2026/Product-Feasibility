@@ -688,7 +688,10 @@ with st.sidebar:
     st.markdown("#### 🌍 国际支付（Stripe）")
     col_s1, col_s2, col_s3 = st.columns(3)
     with col_s1:
-        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/14AeVd6gBbip9Ry0WK8og01")
+        st.markdown(
+    '<a href="https://buy.stripe.com/14AeVd6gBbip9Ry0WK8og01" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #FF6B6B; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; text-decoration: none; text-align: center; font-weight: bold; width: 100%; margin: 0.25rem 0;">🎟️ Single Pass<br>$3</a>',
+    unsafe_allow_html=True
+)
     with col_s2:
         st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/9B6cN5bAVcmt5Bi7l88og02")
     with col_s3:
