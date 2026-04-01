@@ -778,6 +778,20 @@ lang = st.session_state.lang
 t = TEXTS[lang]
 
 st.title(t["title"])
+# 如果处于生成状态，添加脉冲动画
+if st.session_state.pulse_active:
+    st.markdown("""
+    <style>
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 123, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0); }
+        }
+        .stButton button {
+            animation: pulse 1.5s infinite;
+        }
+    </style>
+    """, unsafe_allow_html=True)
 st.markdown("---")
 
 # ================== 侧边栏 ==================
