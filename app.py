@@ -646,7 +646,7 @@ TEXTS = {
         "remaining_label": "Remaining uses",
         "expiry_label": "Valid until",
         "contact_info": "📞 **Contact: Laurence Ku**  \n✉️ Email: nc.ku@hotmail.com  \n📱 Phone/Wechat: +86-13823760640",
-        "purchase_title": "💰 Purchase Report Credits",
+        "purchase_title": "💰 Purchase Report/Download",
         "purchase_table": """
 | Plan | Price | Pass | Validity |
 |------|-------|---------|----------|
