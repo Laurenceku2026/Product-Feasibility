@@ -451,14 +451,6 @@ TEXTS = {
         "expiry_label": "有效期至",
         "contact_info": "📞 **联系人：古生**  \n✉️ 电邮: nc.ku@hotmail.com  \n📱 电话/微信: +86-13823760640",
         "purchase_title": "💰 购买报告次数",
-        "purchase_table": """
-| 套餐 | 价格 | 次数 | 有效期 |
-|------|------|------|--------|
-| 单次通行 | 18元 / 3美元 | 1次 | 无限制 |
-| 100次套餐 | 180元 / 30美元 | 100次 | 1个月 |
-| 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
-""",
-        "purchase_contact": "请通过以下方式联系我们购买，付款后我们会为您生成授权码：\n\n📧 nc.ku@hotmail.com\n📱 +86-13823760640",
         "input_title": "📝 产品信息输入",
         "basic_info": "基本信息",
         "product_name": "产品名称",
@@ -646,15 +638,7 @@ TEXTS = {
         "remaining_label": "Remaining uses",
         "expiry_label": "Valid until",
         "contact_info": "📞 **Contact: Laurence Ku**  \n✉️ Email: nc.ku@hotmail.com  \n📱 Phone/Wechat: +86-13823760640",
-        "purchase_title": "💰 Purchase Report/Download",
-        "purchase_table": """
-| Plan | Price | Pass | Validity |
-|------|-------|---------|----------|
-| Single Pass | 18 RMB / $3 | 1 | Unlimited |
-| 100 Pass | 180 RMB / $30 | 100 | 1 month |
-| 1200 Pass | 1200 RMB / $200 | 1200 | 12 months |
-""",
-        "purchase_contact": "Please contact us to purchase. After payment, we will generate a license key for you:\n\n📧 nc.ku@hotmail.com\n📱 +86-13823760640",
+        "purchase_title": "💰 Purchase Credits",
         "input_title": "📝 Product Information Input",
         "basic_info": "Basic Information",
         "product_name": "Product Name",
@@ -831,6 +815,40 @@ lang = st.session_state.lang
 t = TEXTS[lang]
 
 st.title(t["title"])
+
+# ================== 支付回调处理 ==================
+params = st.query_params
+if "order_success" in params and "plan" in params:
+    plan = params["plan"]
+    if plan == "single":
+        uses = 1
+        months = 9999
+        plan_name = "单次通行"
+    elif plan == "100":
+        uses = 100
+        months = 1
+        plan_name = "100次套餐"
+    elif plan == "1200":
+        uses = 1200
+        months = 12
+        plan_name = "1200次套餐"
+    else:
+        uses = 0
+        months = 0
+        plan_name = "未知"
+    
+    if uses > 0:
+        new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
+        st.success(f"✅ 支付成功！您的授权码已生成：")
+        st.code(new_key, language="text")
+        st.write(f"**套餐**：{plan_name}  |  **次数**：{max_uses}  |  **有效期至**：{expiry_str[:10]}")
+        st.info("请复制上方授权码，在左侧边栏输入即可激活高级功能。")
+        # 清除 URL 参数，避免刷新页面重复触发
+        st.query_params.clear()
+    else:
+        st.error("❌ 支付失败或套餐无效，请联系客服。")
+        st.query_params.clear()
+
 # 如果处于生成状态，添加脉冲动画
 if st.session_state.pulse_active:
     st.markdown("""
@@ -878,11 +896,38 @@ with st.sidebar:
     st.markdown("---")
     st.markdown(t["contact_info"])
     st.markdown("---")
-    # 购买引导（根据语言动态显示）
+    
+    # ================== 购买引导 ==================
     st.markdown(f"## {t['purchase_title']}")
-    st.markdown(t["purchase_table"])
-    st.info(t["purchase_contact"])
+    
+    # 国际支付（Stripe）
+    st.markdown("#### 🌍 国际支付（Stripe）")
+    col_s1, col_s2, col_s3 = st.columns(3)
+    with col_s1:
+        # 请将下方链接替换为您实际的 Stripe 单次通行支付链接
+        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/你的单次链接?plan=single")
+    with col_s2:
+        # 请将下方链接替换为您实际的 Stripe 100次套餐支付链接
+        st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/你的100次链接?plan=100")
+    with col_s3:
+        # 请将下方链接替换为您实际的 Stripe 1200次套餐支付链接
+        st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/你的1200次链接?plan=1200")
+    
+    # 国内支付（麦客）—— 等审核通过后填入实际链接
+    st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
+    st.info("国内支付即将开放，敬请期待。")
+    # 等麦客审核通过后，取消下面的注释并填入实际链接
+    # col1, col2, col3 = st.columns(3)
+    # with col1:
+    #     st.link_button("🎟️ 单次通行\n18元", "https://www.mikecrm.com/你的单次链接?plan=single")
+    # with col2:
+    #     st.link_button("📦 100次套餐\n180元", "https://www.mikecrm.com/你的100次链接?plan=100")
+    # with col3:
+    #     st.link_button("🚀 1200次套餐\n1200元", "https://www.mikecrm.com/你的1200次链接?plan=1200")
+    
+    st.info("支付成功后会自动跳回本页面，授权码将立即显示。")
     st.markdown("---")
+    
     st.markdown(f"## {t['sidebar_title']}")
     st.markdown(t["sidebar_basis"])
     for item in t["basis_items"]:
