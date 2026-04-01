@@ -450,6 +450,15 @@ TEXTS = {
         "remaining_label": "剩余次数",
         "expiry_label": "有效期至",
         "contact_info": "📞 **联系人：古生**  \n✉️ 电邮: nc.ku@hotmail.com  \n📱 电话/微信: +86-13823760640",
+        "purchase_title": "💰 购买报告次数",
+        "purchase_table": """
+| 套餐 | 价格 | 次数 | 有效期 |
+|------|------|------|--------|
+| 单次通行 | 18元 / 3美元 | 1次 | 无限制 |
+| 100次套餐 | 180元 / 30美元 | 100次 | 1个月 |
+| 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
+""",
+        "purchase_contact": "请通过以下方式联系我们购买，付款后我们会为您生成授权码：\n\n📧 nc.ku@hotmail.com\n📱 +86-13823760640",
         "input_title": "📝 产品信息输入",
         "basic_info": "基本信息",
         "product_name": "产品名称",
@@ -637,6 +646,15 @@ TEXTS = {
         "remaining_label": "Remaining uses",
         "expiry_label": "Valid until",
         "contact_info": "📞 **Contact: Laurence Ku**  \n✉️ Email: nc.ku@hotmail.com  \n📱 Phone/Wechat: +86-13823760640",
+        "purchase_title": "💰 Purchase Report Credits",
+        "purchase_table": """
+| Plan | Price | Credits | Validity |
+|------|-------|---------|----------|
+| Single Pass | 18 RMB / $3 | 1 | Unlimited |
+| 100 Credits | 180 RMB / $30 | 100 | 1 month |
+| 1200 Credits | 1200 RMB / $200 | 1200 | 12 months |
+""",
+        "purchase_contact": "Please contact us to purchase. After payment, we will generate a license key for you:\n\n📧 nc.ku@hotmail.com\n📱 +86-13823760640",
         "input_title": "📝 Product Information Input",
         "basic_info": "Basic Information",
         "product_name": "Product Name",
@@ -860,16 +878,10 @@ with st.sidebar:
     st.markdown("---")
     st.markdown(t["contact_info"])
     st.markdown("---")
-    # 添加购买引导
-    st.markdown("## 💰 购买报告次数")
-    st.markdown("""
-| 套餐 | 价格 | 次数 | 有效期 |
-|------|------|------|--------|
-| 单次通行 | 18元 / 3美元 | 1次 | 无限制 |
-| 100次套餐 | 180元 / 30美元 | 100次 | 1个月 |
-| 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
-""")
-    st.info("请通过以下方式联系我们购买，付款后我们会为您生成授权码：\n\n📧 nc.ku@hotmail.com\n📱 +86-13823760640")
+    # 购买引导（根据语言动态显示）
+    st.markdown(f"## {t['purchase_title']}")
+    st.markdown(t["purchase_table"])
+    st.info(t["purchase_contact"])
     st.markdown("---")
     st.markdown(f"## {t['sidebar_title']}")
     st.markdown(t["sidebar_basis"])
