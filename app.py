@@ -65,6 +65,8 @@ def save_usage_data(data):
 # ================== 初始化 session state ==================
 if "lang" not in st.session_state:
     st.session_state.lang = "zh"
+if "pulse_active" not in st.session_state:
+    st.session_state.pulse_active = False
 if "report_content_zh" not in st.session_state:
     st.session_state.report_content_zh = None
 if "report_content_en" not in st.session_state:
