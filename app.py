@@ -370,6 +370,40 @@ def admin_settings_dialog():
         st.write(f"可使用次数：{max_uses} 次，有效期至：{expiry_str[:10]}")
     
     st.markdown("---")
+    st.subheader("生成付费套餐授权码")
+
+    col_price1, col_price2, col_price3 = st.columns(3)
+    with col_price1:
+        st.markdown("**单次通行**")
+        st.markdown("18元 / 3美元")
+        st.markdown("1次 · 无有效期")
+        if st.button("生成单次通行码"):
+            new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=1, custom_months=9999)
+            st.success(f"单次通行授权码：")
+            st.code(new_key, language="text")
+            st.write(f"次数：{max_uses}，有效期：无限制（至 {expiry_str[:10]}）")
+    
+    with col_price2:
+        st.markdown("**100次套餐**")
+        st.markdown("180元 / 30美元")
+        st.markdown("100次 · 1个月")
+        if st.button("生成100次套餐码"):
+            new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=100, custom_months=1)
+            st.success(f"100次套餐授权码：")
+            st.code(new_key, language="text")
+            st.write(f"次数：{max_uses}，有效期：1个月（至 {expiry_str[:10]}）")
+    
+    with col_price3:
+        st.markdown("**1200次套餐**")
+        st.markdown("1200元 / 200美元")
+        st.markdown("1200次 · 12个月")
+        if st.button("生成1200次套餐码"):
+            new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=1200, custom_months=12)
+            st.success(f"1200次套餐授权码：")
+            st.code(new_key, language="text")
+            st.write(f"次数：{max_uses}，有效期：12个月（至 {expiry_str[:10]}）")
+    
+    st.markdown("---")
     st.subheader("已生成的所有 Report Key")
     for key, data in st.session_state.usage_db.items():
         expiry = datetime.fromisoformat(data["expiry"]).strftime("%Y-%m-%d")
@@ -395,7 +429,8 @@ with col4:
             admin_settings_dialog()
         else:
             admin_login_dialog()
-            # ================== 语言文本 ==================
+
+# ================== 语言文本 ==================
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -825,6 +860,17 @@ with st.sidebar:
     st.markdown("---")
     st.markdown(t["contact_info"])
     st.markdown("---")
+    # 添加购买引导
+    st.markdown("## 💰 购买报告次数")
+    st.markdown("""
+| 套餐 | 价格 | 次数 | 有效期 |
+|------|------|------|--------|
+| 单次通行 | 18元 / 3美元 | 1次 | 无限制 |
+| 100次套餐 | 180元 / 30美元 | 100次 | 1个月 |
+| 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
+""")
+    st.info("请通过以下方式联系我们购买，付款后我们会为您生成授权码：\n\n📧 nc.ku@hotmail.com\n📱 +86-13823760640")
+    st.markdown("---")
     st.markdown(f"## {t['sidebar_title']}")
     st.markdown(t["sidebar_basis"])
     for item in t["basis_items"]:
@@ -891,7 +937,6 @@ with col_btn2:
 spinner_placeholder = st.empty()
 
 # ================== 报告生成逻辑 ==================
-# ================== 报告生成逻辑 ==================
 if submitted:
     if not product_name:
         st.error(t["product_name_missing"])
@@ -910,14 +955,12 @@ if submitted:
         if can_generate:
             # 开启脉冲动画
             st.session_state.pulse_active = True
-            # 注意：这里不需要额外 rerun，因为当前运行中脉冲样式已生效
             with spinner_placeholder.container():
                 # 在按钮下方显示居中文字
                 st.markdown(f'<div style="text-align: center; margin-top: 10px;">{t["generating"]}</div>', unsafe_allow_html=True)
                 # 使用空文本的 spinner，只显示奔跑小人动画（默认在右上角）
                 with st.spinner(""):
                     try:
-                        # ---------- 以下为您的报告生成代码（请保持原样） ----------
                         # 构建分析人信息
                         if analyst_name:
                             if analyst_title:
@@ -981,7 +1024,6 @@ if submitted:
                         st.session_state.pulse_active = False
                         st.rerun()
                     except Exception as e:
-                        # 发生错误时也要关闭脉冲
                         st.session_state.pulse_active = False
                         st.error(f"{t['error_prefix']}{e}")
 
