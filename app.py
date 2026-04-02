@@ -898,6 +898,7 @@ st.title(t["title"])
 
 # ================== 支付回调处理（修复复制按钮和手动返回） ==================# ================== 支付回调处理（使用 st.code 自带复制按钮） ==================
 # ================== 支付回调处理（修复复制按钮，保留报告） ==================
+# ================== 支付回调处理（修复复制按钮，保留报告） ==================
 params = st.query_params
 if "order_success" in params and "plan" in params:
     plan = params["plan"]
@@ -943,11 +944,10 @@ if "order_success" in params and "plan" in params:
         new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
         st.session_state.current_report_key = new_key
         
-        # 发送邮件（静默）
         if customer_email:
             send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
         
-        st.success(f"✅ 支付成功！您的授权码已生成并自动填入下方输入框。")
+        st.success("✅ 支付成功！您的授权码已生成并自动填入下方输入框。")
         
         # 使用 st.code 展示授权码（自带复制按钮）
         st.code(new_key, language="text")
@@ -958,11 +958,6 @@ if "order_success" in params and "plan" in params:
     else:
         st.error("❌ 支付失败或套餐无效，请联系客服。")
         st.query_params.clear()
-        st.rerun()
-    else:
-        st.error("❌ 支付失败或套餐无效，请联系客服。")
-        st.query_params.clear()
-
 # ================== 支付对话框 ==================
 @st.dialog("购买+解锁")
 def purchase_dialog():
