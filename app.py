@@ -978,7 +978,8 @@ if "order_success" in params and "plan" in params:
         st.rerun()
     else:
         st.error("❌ 支付失败或套餐无效，请联系客服。")
-        st.query_params.clear()        st.stop()
+        st.query_params.clear()        
+        st.stop()
 # ================== 支付对话框 ==================
 @st.dialog("购买+解锁")
 def purchase_dialog():
