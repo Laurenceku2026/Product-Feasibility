@@ -25,27 +25,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# ================== 自动检测浏览器语言并设置 URL 参数 ==================
-params = st.query_params
-if "lang" not in params:
-    # 首次访问，无 lang 参数，通过 JavaScript 获取浏览器语言并重定向
-    st.markdown("""
-    <script>
-        const userLang = navigator.language || navigator.userLanguage;
-        let lang = userLang.startsWith('zh') ? 'zh' : 'en';
-        const url = new URL(window.location.href);
-        url.searchParams.set('lang', lang);
-        window.location.replace(url.href);
-    </script>
-    """, unsafe_allow_html=True)
-    st.stop()
-else:
-    lang_param = params["lang"]
-    if lang_param in ["zh", "en"]:
-        st.session_state.lang = lang_param
-    else:
-        st.session_state.lang = "en"
-
 # ================== 管理员凭证 ==================
 ADMIN_USERNAME = "Laurence_ku"
 ADMIN_PASSWORD = "Ku_product$2026"
@@ -77,9 +56,9 @@ except:
     SMTP_PASSWORD = ""
 
 def send_license_email(to_email, license_key, plan_name, uses, expiry, lang="zh"):
-    """发送授权码邮件，支持中英文（如果 SMTP 未配置，直接返回成功但不发送）"""
+    """发送授权码邮件，支持中英文"""
     if not SMTP_USER or not SMTP_PASSWORD:
-        return True, "邮件服务未配置，授权码仅显示在页面中"
+        return False, "邮件服务未配置"
     
     if lang == "zh":
         subject = f"您的产品可行性分析系统授权码 - {plan_name}"
@@ -165,6 +144,8 @@ def save_usage_data(data):
         json.dump(data, f, indent=2)
 
 # ================== 初始化 session state ==================
+if "lang" not in st.session_state:
+    st.session_state.lang = "zh"
 if "pulse_active" not in st.session_state:
     st.session_state.pulse_active = False
 if "report_content_zh" not in st.session_state:
@@ -516,12 +497,10 @@ col1, col2, col3, col4 = st.columns([8, 1, 1, 1])
 with col2:
     if st.button("中文", key="zh_btn"):
         st.session_state.lang = "zh"
-        st.query_params.lang = "zh"
         st.rerun()
 with col3:
     if st.button("English", key="en_btn"):
         st.session_state.lang = "en"
-        st.query_params.lang = "en"
         st.rerun()
 with col4:
     if st.button("⚙️", key="settings_btn"):
@@ -530,7 +509,7 @@ with col4:
         else:
             admin_login_dialog()
 
-# ================== 语言文本（完整版） ==================
+# ================== 语言文本（包含完整 report_prompt） ==================
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -964,6 +943,7 @@ if "order_success" in params and "plan" in params:
         new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
         st.session_state.current_report_key = new_key
         
+        # 发送邮件
         if customer_email:
             success, msg = send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
             if success:
@@ -973,6 +953,7 @@ if "order_success" in params and "plan" in params:
         else:
             st.info("未获取到您的邮箱，授权码仅显示在下方。")
         
+        # 显示成功消息和复制按钮
         st.success(f"✅ 支付成功！您的授权码已生成并自动填入下方输入框。")
         copy_js = f"""
         <div style="background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin-top: 10px;">
@@ -1010,6 +991,14 @@ def purchase_dialog():
         st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/9B67sL0Wh7298Nuaxk8og00")
     st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
     st.info("国内支付即将开放，敬请期待。")
+    # 等麦客审核通过后，取消下面的注释并填入实际链接
+    # col_a, col_b, col_c = st.columns(3)
+    # with col_a:
+    #     st.link_button("🎟️ 单次通行\n18元", "https://www.mikecrm.com/你的单次链接?plan=single")
+    # with col_b:
+    #     st.link_button("📦 100次套餐\n180元", "https://www.mikecrm.com/你的100次链接?plan=100")
+    # with col_c:
+    #     st.link_button("🚀 1200次套餐\n1200元", "https://www.mikecrm.com/你的1200次链接?plan=1200")
     st.markdown("支付成功后会自动跳回本页面，授权码将自动填入并激活。")
 
 # ================== 侧边栏 ==================
@@ -1044,7 +1033,7 @@ with st.sidebar:
     st.markdown(t["contact_info"])
     st.markdown("---")
     
-    # 购买引导
+    # ================== 购买引导（侧边栏） ==================
     st.markdown(f"## {t['purchase_title']}")
     st.markdown("""
 | 套餐 | 价格 | 次数 | 有效期 |
@@ -1128,6 +1117,7 @@ col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
 with col_btn2:
     submitted = st.button(t["submit_btn"], type="primary", use_container_width=True)
 
+# 创建一个空容器，用于显示加载动画和文字（位于按钮下方）
 spinner_placeholder = st.empty()
 
 # ================== 报告生成逻辑 ==================
