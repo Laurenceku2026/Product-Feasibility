@@ -55,19 +55,23 @@ except:
     SMTP_USER = ""
     SMTP_PASSWORD = ""
 
-def send_license_email(to_email, license_key, plan_name, uses, expiry):
-    """发送授权码邮件"""
+def send_license_email(to_email, license_key, plan_name, uses, expiry, lang="zh"):
+    """发送授权码邮件，支持中英文"""
     if not SMTP_USER or not SMTP_PASSWORD:
         return False, "邮件服务未配置"
-    subject = f"您的产品可行性分析系统授权码 - {plan_name}"
-    body = f"""
-尊敬的客户：
+    
+    if lang == "zh":
+        subject = f"您的产品可行性分析系统授权码 - {plan_name}"
+        body = f"""
+亲爱的用户：
 
-感谢您购买产品可行性分析系统的 {plan_name}！
+感谢您对 Techlife 产品的信任！
 
-您的授权码为：{license_key}
+您的产品分析报告通行证已生成，详情如下：
 
-- 可使用次数：{uses}
+- 授权码：{license_key}
+- 套餐：{plan_name}
+- 可用次数：{uses}
 - 有效期至：{expiry}
 
 请在系统左侧边栏的“授权码 (Report Key)”输入框中输入此授权码，即可解锁高级功能（无水印、可下载 Word 报告）。
@@ -76,7 +80,29 @@ def send_license_email(to_email, license_key, plan_name, uses, expiry):
 
 祝您使用愉快！
 
-产品可行性分析系统
+Techlife 产品可行性分析系统
+"""
+    else:
+        subject = f"Your License Key for Product Feasibility Analysis System - {plan_name}"
+        body = f"""
+Dear Customer,
+
+Thank you for trusting Techlife products!
+
+Your product analysis report pass has been generated. Details are as follows:
+
+- License Key: {license_key}
+- Plan: {plan_name}
+- Available uses: {uses}
+- Valid until: {expiry}
+
+Please enter this license key in the "Report Key" input box on the left sidebar to unlock advanced features (no watermark, Word report download available).
+
+Please keep this license key safe. If you have any questions, please contact: nc.ku@hotmail.com
+
+Best regards,
+
+Techlife Product Feasibility Analysis System
 """
     msg = MIMEMultipart()
     msg['From'] = SMTP_USER
@@ -483,7 +509,7 @@ with col4:
         else:
             admin_login_dialog()
 
-# ================== 语言文本 ==================
+# ================== 语言文本（包含完整 report_prompt） ==================
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -547,7 +573,132 @@ TEXTS = {
         "footer": "© 2026 Laurence Ku | AI产品可行性分析系统 | 基于25年研发管理经验",
         "trial_ended": "试用已结束，请联系 nc.ku@hotmail.com",
         "no_license": "未输入授权码，当前为试用模式（有水印、不可复制、不可下载）",
-        "report_prompt": """（此处省略，与您的最终版相同）"""
+        "report_prompt": """
+你是一位资深产品分析师和研发顾问，拥有25年消费电子及智能硬件行业经验。请根据以下产品信息，生成一份专业的《产品可行性分析报告》。
+
+报告必须严格按照以下Markdown结构输出，内容要具体、有洞察，数据基于行业常识合理推断。重要要求：
+1. 表格必须使用标准Markdown表格语法，即使用竖线分隔单元格，第二行为分隔行（例如 |---|---|）。
+2. 禁止在表格内外使用任何加粗标记（如 ** 或 *），也不要使用斜体。所有文本保持纯文本格式。
+3. 禁止在表格单元格内使用换行符或复杂格式。
+
+# 《产品可行性分析报告》
+## {product_name}
+
+## 报告基本信息
+
+| 项目 | 内容 |
+|------|------|
+| 产品名称 | {product_name} |
+| 产品描述 | {product_description} |
+| 目标市场 | {target_markets} |
+| 目标用户 | {target_users} |
+| 报告日期 | {{CURRENT_DATE}} |
+| 分析人 | {{ANALYST_INFO}} |
+
+---
+
+## 第一部分：市场需求分析
+
+### 1.1 市场规模与趋势
+
+（请根据目标市场分别列出主要市场的规模、增长率、驱动因素和瓶颈，用表格形式）
+
+### 1.2 用户画像
+
+（用表格描述核心用户特征）
+
+### 1.3 用户痛点分析
+
+（列出3-5个核心痛点，用表格说明提及频率和描述）
+
+### 1.4 关键功能需求排序
+
+（用表格列出功能、重要性评分和说明）
+
+---
+
+## 第二部分：竞品分析
+
+### 2.1 主要竞争对手
+
+（根据产品品类，列出至少3个主要竞品，用表格说明品牌、产品、优势、劣势、定价区间）
+
+### 2.2 竞品功能对比
+
+（选择5-6个关键功能进行对比，用表格展示）
+
+### 2.3 市场空白点分析
+
+（列出至少3个市场空白机会）
+
+---
+
+## 第三部分：渠道适配性分析
+
+### 3.1 目标市场渠道结构
+
+（用表格描述主要渠道类型、占比、特点、适合度）
+
+### 3.2 客户现有渠道现状
+
+（基于用户输入：渠道情况={channel_status}，渠道详情={channel_detail}，品牌认知度={brand_status}，进行分析）
+
+### 3.3 渠道策略建议
+
+（按年份给出渠道拓展建议，用表格）
+
+---
+
+## 第四部分：技术可行性评估
+
+### 4.1 关键技术要求
+
+（用表格列出关键技术项、要求、客户现有能力、风险评估）
+
+### 4.2 开发周期估算
+
+（用表格列出阶段、时间、关键任务）
+
+### 4.3 关键风险点
+
+（用表格列出风险、可能性、影响、应对措施）
+
+---
+
+## 第五部分：销售预测
+
+### 5.1 预测模型假设
+
+（列出定价、目标市场、份额等假设）
+
+### 5.2 销售额预测
+
+（3年预测，用表格）
+
+### 5.3 投资回报估算
+
+（用表格列出研发投入、市场推广、首批生产成本、总启动资金、毛利率、盈亏平衡点）
+
+---
+
+## 第六部分：结论与建议
+
+### 6.1 综合评估
+
+（用表格打分：市场吸引力、技术可行性、渠道匹配度、竞争格局、投资回报，各1-10分，并说明）
+
+### 6.2 差异化定位建议
+
+（给出2-3个定位选项，用表格分析优势和风险）
+
+### 6.3 最终建议
+
+（给出综合评分和建议的下一步行动，5点以内）
+
+---
+
+请直接输出报告内容，不要添加额外解释。对于用户未提供的信息，基于行业标准进行合理推断，并注明“基于行业分析”。
+"""
     },
     "en": {
         "title": "📊 Product Feasibility - AI Analysis System",
@@ -611,7 +762,132 @@ TEXTS = {
         "footer": "© 2026 Laurence Ku | AI Product Feasibility System | Based on 25+ years R&D experience",
         "trial_ended": "Trial finished, please contact nc.ku@hotmail.com",
         "no_license": "No Report Key entered. Trial mode (watermark, no copy, no download).",
-        "report_prompt": """（此处省略，与您的最终版相同）"""
+        "report_prompt": """
+You are a senior product analyst and R&D consultant with 25 years of experience in consumer electronics and smart hardware. Based on the following product information, generate a professional "Product Feasibility Analysis Report".
+
+The report must strictly follow the Markdown structure below. The content should be specific, insightful, and based on industry common sense. Important requirements:
+1. Tables must use standard Markdown table syntax (e.g., | Header | Header |, |---|---|).
+2. Do not use any bold or italic markers (like ** or *) inside or outside tables. Keep all text plain.
+3. Do not use line breaks or complex formatting inside table cells.
+
+# Product Feasibility Analysis Report
+## {product_name}
+
+## Report Basic Information
+
+| Item | Content |
+|------|---------|
+| Product Name | {product_name} |
+| Product Description | {product_description} |
+| Target Markets | {target_markets} |
+| Target Users | {target_users} |
+| Report Date | {{CURRENT_DATE}} |
+| Analyst | {{ANALYST_INFO}} |
+
+---
+
+## Part 1: Market Demand Analysis
+
+### 1.1 Market Size & Trends
+
+(For each target market, list market size, growth rate, key drivers and barriers in a table)
+
+### 1.2 User Persona
+
+(Describe core user characteristics in a table)
+
+### 1.3 User Pain Points
+
+(List 3-5 core pain points in a table with frequency and description)
+
+### 1.4 Key Feature Priority
+
+(List features, importance score, and explanation in a table)
+
+---
+
+## Part 2: Competitive Analysis
+
+### 2.1 Main Competitors
+
+(List at least 3 main competitors with brand, product, strengths, weaknesses, price range in a table)
+
+### 2.2 Feature Comparison
+
+(Compare 5-6 key features in a table)
+
+### 2.3 Market Gap Summary
+
+(List at least 3 market gap opportunities)
+
+---
+
+## Part 3: Channel Suitability Analysis
+
+### 3.1 Target Market Channel Structure
+
+(Describe main channel types, share, characteristics, suitability in a table)
+
+### 3.2 Client's Current Channel Status
+
+(Based on user input: channel status={channel_status}, channel details={channel_detail}, brand awareness={brand_status})
+
+### 3.3 Channel Strategy Recommendations
+
+(Provide channel expansion recommendations by year in a table)
+
+---
+
+## Part 4: Technical Feasibility Assessment
+
+### 4.1 Key Technical Requirements
+
+(List technology, requirement, client capability, risk level in a table)
+
+### 4.2 Development Timeline Estimate
+
+(List phase, duration, key tasks in a table)
+
+### 4.3 Key Risk Points
+
+(List risk, probability, impact, mitigation in a table)
+
+---
+
+## Part 5: Sales Forecast
+
+### 5.1 Forecast Assumptions
+
+(List pricing, target market, share assumptions)
+
+### 5.2 Sales Forecast
+
+(3-year forecast in a table)
+
+### 5.3 ROI Estimate
+
+(List R&D investment, marketing, first production cost, total capital, gross margin, breakeven point in a table)
+
+---
+
+## Part 6: Conclusion & Recommendations
+
+### 6.1 Comprehensive Evaluation
+
+(Score each dimension: Market Attractiveness, Technical Feasibility, Channel Fit, Competitive Landscape, ROI Potential out of 10, with explanation in a table)
+
+### 6.2 Differentiation Positioning Recommendations
+
+(Provide 2-3 positioning options with advantages and risks in a table)
+
+### 6.3 Final Recommendation
+
+(Provide overall score and 5 specific next steps)
+
+---
+
+Output the report directly without additional explanation. For information not provided by the user, make reasonable inferences based on industry standards and note "based on industry analysis".
+"""
     }
 }
 
@@ -626,22 +902,42 @@ params = st.query_params
 if "order_success" in params and "plan" in params:
     plan = params["plan"]
     customer_email = params.get("email", None)
-    if plan == "single":
-        uses = 1
-        months = 9999
-        plan_name = "单次通行"
-    elif plan == "100":
-        uses = 100
-        months = 1
-        plan_name = "100次套餐"
-    elif plan == "1200":
-        uses = 1200
-        months = 12
-        plan_name = "1200次套餐"
+    current_lang = st.session_state.lang
+    
+    if current_lang == "zh":
+        if plan == "single":
+            uses = 1
+            months = 9999
+            plan_name = "单次通行"
+        elif plan == "100":
+            uses = 100
+            months = 1
+            plan_name = "100次套餐"
+        elif plan == "1200":
+            uses = 1200
+            months = 12
+            plan_name = "1200次套餐"
+        else:
+            uses = 0
+            months = 0
+            plan_name = "未知"
     else:
-        uses = 0
-        months = 0
-        plan_name = "未知"
+        if plan == "single":
+            uses = 1
+            months = 9999
+            plan_name = "Single Pass"
+        elif plan == "100":
+            uses = 100
+            months = 1
+            plan_name = "100 Credits"
+        elif plan == "1200":
+            uses = 1200
+            months = 12
+            plan_name = "1200 Credits"
+        else:
+            uses = 0
+            months = 0
+            plan_name = "Unknown"
     
     if uses > 0:
         new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
@@ -649,7 +945,7 @@ if "order_success" in params and "plan" in params:
         
         # 发送邮件
         if customer_email:
-            success, msg = send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10])
+            success, msg = send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
             if success:
                 st.success("✅ 授权码已同时发送至您的邮箱。")
             else:
