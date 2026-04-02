@@ -894,6 +894,15 @@ Output the report directly without additional explanation. For information not p
 lang = st.session_state.lang
 t = TEXTS[lang]
 
+# ================== 自动激活授权码（从 URL 参数获取） ==================
+auto_key = st.query_params.get("auto_activate", None)
+if auto_key:
+    valid, remaining, expiry_str, lic_type = activate_license(auto_key)
+    if valid:
+        st.session_state.current_report_key = auto_key
+        st.success(f"✅ 授权已激活！剩余 {remaining} 次，有效期至 {expiry_str[:10]}")
+    # 清除 URL 参数，避免刷新重复激活
+    st.query_params.clear()
 st.title(t["title"])
 
 # ================== 支付回调处理（修复复制按钮和手动返回） ==================# ================== 支付回调处理（使用 st.code 自带复制按钮） ==================
