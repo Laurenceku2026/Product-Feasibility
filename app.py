@@ -25,6 +25,28 @@ st.set_page_config(
     layout="wide"
 )
 
+# ================== 自动检测浏览器语言并设置 URL 参数 ==================
+params = st.query_params
+if "lang" not in params:
+    # 首次访问，无 lang 参数，通过 JavaScript 获取浏览器语言并重定向
+    st.markdown("""
+    <script>
+        const userLang = navigator.language || navigator.userLanguage;
+        let lang = userLang.startsWith('zh') ? 'zh' : 'en';
+        const url = new URL(window.location.href);
+        url.searchParams.set('lang', lang);
+        window.location.replace(url.href);
+    </script>
+    """, unsafe_allow_html=True)
+    st.stop()  # 停止渲染，等待重定向
+else:
+    # 已有 lang 参数，设置 session_state
+    lang_param = params["lang"]
+    if lang_param in ["zh", "en"]:
+        st.session_state.lang = lang_param
+    else:
+        st.session_state.lang = "en"
+
 # ================== 管理员凭证 ==================
 ADMIN_USERNAME = "Laurence_ku"
 ADMIN_PASSWORD = "Ku_product$2026"
@@ -143,9 +165,7 @@ def save_usage_data(data):
     with open(USAGE_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
-# ================== 初始化 session state ==================
-if "lang" not in st.session_state:
-    st.session_state.lang = "zh"
+# ================== 初始化 session state（语言已由 URL 参数设置） ==================
 if "pulse_active" not in st.session_state:
     st.session_state.pulse_active = False
 if "report_content_zh" not in st.session_state:
@@ -492,15 +512,17 @@ def admin_settings_dialog():
     st.subheader("永久修改 API Key")
     st.markdown("请前往 [Streamlit Cloud Secrets](https://share.streamlit.io/) 修改 `AI_API_KEY`、`AI_BASE_URL` 和 `AI_MODEL_NAME`，然后重启应用。")
 
-# ================== 右上角按钮 ==================
+# ================== 右上角按钮（手动切换，同时更新 URL 参数） ==================
 col1, col2, col3, col4 = st.columns([8, 1, 1, 1])
 with col2:
-    if st.button("中文", key="zh_btn"):
+    if st.button("中文"):
         st.session_state.lang = "zh"
+        st.query_params.lang = "zh"
         st.rerun()
 with col3:
-    if st.button("English", key="en_btn"):
+    if st.button("English"):
         st.session_state.lang = "en"
+        st.query_params.lang = "en"
         st.rerun()
 with col4:
     if st.button("⚙️", key="settings_btn"):
