@@ -5,6 +5,7 @@ import os
 import re
 import secrets
 import string
+import time
 from io import BytesIO
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
@@ -450,15 +451,7 @@ TEXTS = {
         "remaining_label": "剩余次数",
         "expiry_label": "有效期至",
         "contact_info": "📞 **联系人：古生**  \n✉️ 电邮: nc.ku@hotmail.com  \n📱 电话/微信: +86-13823760640",
-        "purchase_title": "💰 购买报告次数",
-        "purchase_table": """
-| 套餐 | 价格 | 次数 | 有效期 |
-|------|------|------|--------|
-| 单次通行 | 18元 / 3美元 | 1次 | 无限制 |
-| 100次套餐 | 180元 / 30美元 | 100次 | 1个月 |
-| 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
-""",
-        "purchase_contact": "请通过以下方式联系我们购买，付款后我们会为您生成授权码：\n\n📧 nc.ku@hotmail.com\n📱 +86-13823760640",
+        "purchase_title": "💰 购买+解锁",
         "input_title": "📝 产品信息输入",
         "basic_info": "基本信息",
         "product_name": "产品名称",
@@ -496,6 +489,7 @@ TEXTS = {
         "report_title": "📄 生成的可行性分析报告",
         "download_section": "📥 下载报告",
         "download_btn": "下载 Word 文档",
+        "download_unlock_btn": "📥 下载报告+解锁",
         "key_error": "授权码无效或已过期",
         "back_btn": "← 返回重新填写",
         "footer": "© 2026 Laurence Ku | AI产品可行性分析系统 | 基于25年研发管理经验",
@@ -646,15 +640,7 @@ TEXTS = {
         "remaining_label": "Remaining uses",
         "expiry_label": "Valid until",
         "contact_info": "📞 **Contact: Laurence Ku**  \n✉️ Email: nc.ku@hotmail.com  \n📱 Phone/Wechat: +86-13823760640",
-        "purchase_title": "💰 Purchase Report/Download",
-        "purchase_table": """
-| Plan | Price | Pass | Validity |
-|------|-------|---------|----------|
-| Single Pass | 18 RMB / $3 | 1 | Unlimited |
-| 100 Pass | 180 RMB / $30 | 100 | 1 month |
-| 1200 Pass | 1200 RMB / $200 | 1200 | 12 months |
-""",
-        "purchase_contact": "Please contact us to purchase. After payment, we will generate a license key for you:\n\n📧 nc.ku@hotmail.com\n📱 +86-13823760640",
+        "purchase_title": "💰 Purchase + Unlock",
         "input_title": "📝 Product Information Input",
         "basic_info": "Basic Information",
         "product_name": "Product Name",
@@ -692,6 +678,7 @@ TEXTS = {
         "report_title": "📄 Generated Feasibility Analysis Report",
         "download_section": "📥 Download Report",
         "download_btn": "Download Word Document",
+        "download_unlock_btn": "📥 Download Report + Unlock",
         "key_error": "Invalid or expired Report Key",
         "back_btn": "← Back to re-enter",
         "footer": "© 2026 Laurence Ku | AI Product Feasibility System | Based on 25+ years R&D experience",
@@ -825,27 +812,85 @@ Output the report directly without additional explanation. For information not p
 """
     }
 }
-
 # ================== 获取当前语言 ==================
 lang = st.session_state.lang
 t = TEXTS[lang]
 
 st.title(t["title"])
-# 如果处于生成状态，添加脉冲动画
-if st.session_state.pulse_active:
+
+# ================== 支付回调处理 ==================
+params = st.query_params
+if "order_success" in params and "plan" in params:
+    plan = params["plan"]
+    if plan == "single":
+        uses = 1
+        months = 9999
+        plan_name = "单次通行"
+    elif plan == "100":
+        uses = 100
+        months = 1
+        plan_name = "100次套餐"
+    elif plan == "1200":
+        uses = 1200
+        months = 12
+        plan_name = "1200次套餐"
+    else:
+        uses = 0
+        months = 0
+        plan_name = "未知"
+    
+    if uses > 0:
+        new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
+        # 将授权码自动填入侧边栏输入框
+        st.session_state.current_report_key = new_key
+        # 显示成功消息，带复制按钮
+        st.success(f"✅ 支付成功！您的授权码已生成并自动填入下方输入框。")
+        # 使用 HTML/JS 实现复制功能
+        copy_js = f"""
+        <div style="background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin-top: 10px;">
+            <code style="font-size: 16px;">{new_key}</code>
+            <button onclick="navigator.clipboard.writeText('{new_key}')" style="margin-left: 10px;">📋 复制授权码</button>
+        </div>
+        <p style="margin-top: 10px;">⚠️ 请务必保存好此授权码，下次使用时可复制粘贴到左侧输入框。</p>
+        """
+        st.markdown(copy_js, unsafe_allow_html=True)
+        st.info("页面即将刷新，授权码将自动生效...")
+        time.sleep(2)
+        st.rerun()
+    else:
+        st.error("❌ 支付失败或套餐无效，请联系客服。")
+        st.query_params.clear()
+
+# ================== 支付对话框 ==================
+@st.dialog("购买+解锁")
+def purchase_dialog():
+    st.markdown("### 选择套餐")
     st.markdown("""
-    <style>
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(0, 123, 255, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0); }
-        }
-        .stButton button {
-            animation: pulse 1.5s infinite;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-st.markdown("---")
+| 套餐 | 价格 | 次数 | 有效期 |
+|------|------|------|--------|
+| 单次通行 | 18元 / 3美元 | 1次 | 无限制 |
+| 100次套餐 | 180元 / 30美元 | 100次 | 1个月 |
+| 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
+""")
+    st.markdown("#### 🌍 国际支付（Stripe）")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/你的单次链接?plan=single")
+    with col2:
+        st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/你的100次链接?plan=100")
+    with col3:
+        st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/你的1200次链接?plan=1200")
+    st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
+    st.info("国内支付即将开放，敬请期待。")
+    # 等麦客审核通过后，取消下面的注释并填入实际链接
+    # col_a, col_b, col_c = st.columns(3)
+    # with col_a:
+    #     st.link_button("🎟️ 单次通行\n18元", "https://www.mikecrm.com/你的单次链接?plan=single")
+    # with col_b:
+    #     st.link_button("📦 100次套餐\n180元", "https://www.mikecrm.com/你的100次链接?plan=100")
+    # with col_c:
+    #     st.link_button("🚀 1200次套餐\n1200元", "https://www.mikecrm.com/你的1200次链接?plan=1200")
+    st.markdown("支付成功后会自动跳回本页面，授权码将自动填入并激活。")
 
 # ================== 侧边栏 ==================
 with st.sidebar:
@@ -878,11 +923,29 @@ with st.sidebar:
     st.markdown("---")
     st.markdown(t["contact_info"])
     st.markdown("---")
-    # 购买引导（根据语言动态显示）
+    
+    # ================== 购买引导（侧边栏） ==================
     st.markdown(f"## {t['purchase_title']}")
-    st.markdown(t["purchase_table"])
-    st.info(t["purchase_contact"])
+    st.markdown("""
+| 套餐 | 价格 | 次数 | 有效期 |
+|------|------|------|--------|
+| 单次通行 | 18元 / 3美元 | 1次 | 无限制 |
+| 100次套餐 | 180元 / 30美元 | 100次 | 1个月 |
+| 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
+""")
+    st.markdown("#### 🌍 国际支付（Stripe）")
+    col_s1, col_s2, col_s3 = st.columns(3)
+    with col_s1:
+        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/你的单次链接?plan=single")
+    with col_s2:
+        st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/你的100次链接?plan=100")
+    with col_s3:
+        st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/你的1200次链接?plan=1200")
+    st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
+    st.info("国内支付即将开放，敬请期待。")
+    st.info("支付成功后会自动跳回本页面，授权码将自动填入并激活。")
     st.markdown("---")
+    
     st.markdown(f"## {t['sidebar_title']}")
     st.markdown(t["sidebar_basis"])
     for item in t["basis_items"]:
@@ -1057,6 +1120,7 @@ if current_report:
     st.markdown("---")
     st.markdown(f"### {t['download_section']}")
     if premium:
+        # 已授权用户直接下载
         doc = Document()
         markdown_to_docx(current_report, doc)
         doc_bytes = BytesIO()
@@ -1069,7 +1133,9 @@ if current_report:
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
     else:
-        st.warning("请联系 nc.ku@hotmail.com 获取完整报告。")
+        # 非授权用户显示“下载报告+解锁”按钮，点击后弹出购买对话框
+        if st.button(t["download_unlock_btn"], use_container_width=True):
+            purchase_dialog()
     
     if st.button(t["back_btn"]):
         if lang == "zh":
