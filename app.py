@@ -958,7 +958,7 @@ if "order_success" in params and "plan" in params:
     else:
         st.error("❌ 支付失败或套餐无效，请联系客服。")
         st.query_params.clear()
-            st.rerun()
+        st.rerun()
     else:
         st.error("❌ 支付失败或套餐无效，请联系客服。")
         st.query_params.clear()
