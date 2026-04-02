@@ -896,7 +896,7 @@ t = TEXTS[lang]
 
 st.title(t["title"])
 
-# ================== 支付回调处理（修复复制按钮和手动返回） ==================
+# ================== 支付回调处理（修复复制按钮和手动返回） ==================# ================== 支付回调处理（使用 st.code 自带复制按钮） ==================
 params = st.query_params
 if "order_success" in params and "plan" in params:
     plan = params["plan"]
@@ -946,30 +946,14 @@ if "order_success" in params and "plan" in params:
         if customer_email:
             send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
         
-        # 显示成功消息和复制按钮（增强复制功能）
+        # 显示成功消息
         st.success(f"✅ 支付成功！您的授权码已生成并自动填入下方输入框。")
         
-        # 使用自定义 HTML + JavaScript 确保复制功能正常
-        copy_js = f"""
-        <div style="background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin-top: 10px;">
-            <code id="license-key" style="font-size: 16px;">{new_key}</code>
-            <button id="copy-btn" style="margin-left: 10px;">📋 复制授权码</button>
-        </div>
-        <p style="margin-top: 10px;">⚠️ 请务必保存好此授权码，下次使用时可复制粘贴到左侧输入框。</p>
-        <script>
-            document.getElementById('copy-btn').addEventListener('click', function() {{
-                const code = document.getElementById('license-key').innerText;
-                navigator.clipboard.writeText(code).then(function() {{
-                    alert('授权码已复制到剪贴板！');
-                }}, function(err) {{
-                    alert('复制失败，请手动复制。');
-                }});
-            }});
-        </script>
-        """
-        st.markdown(copy_js, unsafe_allow_html=True)
+        # 使用 st.code 展示授权码（自带复制按钮）
+        st.code(new_key, language="text")
+        st.caption("⚠️ 请务必保存好此授权码，下次使用时可复制粘贴到左侧输入框。")
         
-        # 显示手动返回按钮，不自动刷新
+        # 显示手动返回按钮
         if st.button("✅ 返回并继续使用"):
             st.query_params.clear()
             st.rerun()
