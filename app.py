@@ -897,6 +897,7 @@ t = TEXTS[lang]
 st.title(t["title"])
 
 # ================== 支付回调处理（修复复制按钮和手动返回） ==================# ================== 支付回调处理（使用 st.code 自带复制按钮） ==================
+# ================== 支付回调处理（修复复制按钮，保留报告） ==================
 params = st.query_params
 if "order_success" in params and "plan" in params:
     plan = params["plan"]
@@ -946,16 +947,17 @@ if "order_success" in params and "plan" in params:
         if customer_email:
             send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
         
-        # 显示成功消息
         st.success(f"✅ 支付成功！您的授权码已生成并自动填入下方输入框。")
         
         # 使用 st.code 展示授权码（自带复制按钮）
         st.code(new_key, language="text")
         st.caption("⚠️ 请务必保存好此授权码，下次使用时可复制粘贴到左侧输入框。")
         
-        # 显示手动返回按钮
-        if st.button("✅ 返回并继续使用"):
-            st.query_params.clear()
+        # 返回链接：直接跳转到不带参数的主页，保留 session_state（不会丢失报告）
+        st.markdown(f'<a href="https://appuct-feasibility-ktqejrpgdsbxwfjbcsorqq.streamlit.app/" target="_self">✅ 返回并继续使用</a>', unsafe_allow_html=True)
+    else:
+        st.error("❌ 支付失败或套餐无效，请联系客服。")
+        st.query_params.clear()
             st.rerun()
     else:
         st.error("❌ 支付失败或套餐无效，请联系客服。")
