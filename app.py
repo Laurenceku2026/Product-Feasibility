@@ -984,7 +984,7 @@ def purchase_dialog():
     st.markdown("#### 🌍 国际支付（Stripe）")
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/14AeVd6gBbip9Ry0WK8og01")
+        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/test_9B67sL0Wh7298Nuaxk8og00")
     with col2:
         st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/9B6cN5bAVcmt5Bi7l88og02")
     with col3:
@@ -1045,7 +1045,7 @@ with st.sidebar:
     st.markdown("#### 🌍 国际支付（Stripe）")
     col_s1, col_s2, col_s3 = st.columns(3)
     with col_s1:
-        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/14AeVd6gBbip9Ry0WK8og01")
+        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/test_9B67sL0Wh7298Nuaxk8og00")
     with col_s2:
         st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/9B6cN5bAVcmt5Bi7l88og02")
     with col_s3:
