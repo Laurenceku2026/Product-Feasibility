@@ -56,9 +56,10 @@ except:
     SMTP_PASSWORD = ""
 
 def send_license_email(to_email, license_key, plan_name, uses, expiry, lang="zh"):
-    """发送授权码邮件，支持中英文（静默失败）"""
+    """发送授权码邮件，支持中英文"""
     if not SMTP_USER or not SMTP_PASSWORD:
-        return False
+        return False, "邮件服务未配置"
+    
     if lang == "zh":
         subject = f"您的产品可行性分析系统授权码 - {plan_name}"
         body = f"""
@@ -114,9 +115,9 @@ Techlife Product Feasibility Analysis System
         server.login(SMTP_USER, SMTP_PASSWORD)
         server.sendmail(SMTP_USER, [to_email], msg.as_string())
         server.quit()
-        return True
-    except Exception:
-        return False
+        return True, ""
+    except Exception as e:
+        return False, str(e)
 
 # ================== 授权类型定义 ==================
 LICENSE_TYPES = {
@@ -508,7 +509,7 @@ with col4:
         else:
             admin_login_dialog()
 
-# ================== 语言文本（完整版，从原文件中提取） ==================
+# ================== 语言文本（包含完整 report_prompt） ==================
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -896,7 +897,7 @@ t = TEXTS[lang]
 
 st.title(t["title"])
 
-# ================== 支付回调处理（修复复制按钮和手动返回） ==================
+# ================== 支付回调处理 ==================
 params = st.query_params
 if "order_success" in params and "plan" in params:
     plan = params["plan"]
@@ -942,37 +943,29 @@ if "order_success" in params and "plan" in params:
         new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
         st.session_state.current_report_key = new_key
         
-        # 发送邮件（静默）
+        # 发送邮件
         if customer_email:
-            send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
+            success, msg = send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
+            if success:
+                st.success("✅ 授权码已同时发送至您的邮箱。")
+            else:
+                st.warning(f"⚠️ 邮件发送失败，请联系客服。错误：{msg}")
+        else:
+            st.info("未获取到您的邮箱，授权码仅显示在下方。")
         
-        # 显示成功消息和复制按钮（增强复制功能）
+        # 显示成功消息和复制按钮
         st.success(f"✅ 支付成功！您的授权码已生成并自动填入下方输入框。")
-        
-        # 使用自定义 HTML + JavaScript 确保复制功能正常
         copy_js = f"""
         <div style="background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin-top: 10px;">
-            <code id="license-key" style="font-size: 16px;">{new_key}</code>
-            <button id="copy-btn" style="margin-left: 10px;">📋 复制授权码</button>
+            <code style="font-size: 16px;">{new_key}</code>
+            <button onclick="navigator.clipboard.writeText('{new_key}')" style="margin-left: 10px;">📋 复制授权码</button>
         </div>
         <p style="margin-top: 10px;">⚠️ 请务必保存好此授权码，下次使用时可复制粘贴到左侧输入框。</p>
-        <script>
-            document.getElementById('copy-btn').addEventListener('click', function() {{
-                const code = document.getElementById('license-key').innerText;
-                navigator.clipboard.writeText(code).then(function() {{
-                    alert('授权码已复制到剪贴板！');
-                }}, function(err) {{
-                    alert('复制失败，请手动复制。');
-                }});
-            }});
-        </script>
         """
         st.markdown(copy_js, unsafe_allow_html=True)
-        
-        # 显示手动返回按钮，不自动刷新
-        if st.button("✅ 返回并继续使用"):
-            st.query_params.clear()
-            st.rerun()
+        st.info("页面即将刷新，授权码将自动生效...")
+        time.sleep(2)
+        st.rerun()
     else:
         st.error("❌ 支付失败或套餐无效，请联系客服。")
         st.query_params.clear()
@@ -998,6 +991,14 @@ def purchase_dialog():
         st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/9B67sL0Wh7298Nuaxk8og00")
     st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
     st.info("国内支付即将开放，敬请期待。")
+    # 等麦客审核通过后，取消下面的注释并填入实际链接
+    # col_a, col_b, col_c = st.columns(3)
+    # with col_a:
+    #     st.link_button("🎟️ 单次通行\n18元", "https://www.mikecrm.com/你的单次链接?plan=single")
+    # with col_b:
+    #     st.link_button("📦 100次套餐\n180元", "https://www.mikecrm.com/你的100次链接?plan=100")
+    # with col_c:
+    #     st.link_button("🚀 1200次套餐\n1200元", "https://www.mikecrm.com/你的1200次链接?plan=1200")
     st.markdown("支付成功后会自动跳回本页面，授权码将自动填入并激活。")
 
 # ================== 侧边栏 ==================
@@ -1116,6 +1117,7 @@ col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
 with col_btn2:
     submitted = st.button(t["submit_btn"], type="primary", use_container_width=True)
 
+# 创建一个空容器，用于显示加载动画和文字（位于按钮下方）
 spinner_placeholder = st.empty()
 
 # ================== 报告生成逻辑 ==================
