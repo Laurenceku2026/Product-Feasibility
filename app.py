@@ -5,6 +5,11 @@ import os
 import re
 import secrets
 import string
+import time
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.header import Header
 from io import BytesIO
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
@@ -37,6 +42,81 @@ try:
     PERSISTENT_MODEL_NAME = st.secrets["AI_MODEL_NAME"]
 except:
     PERSISTENT_MODEL_NAME = "deepseek-chat"
+
+# ================== 从 secrets 读取 SMTP 邮件配置 ==================
+try:
+    SMTP_SERVER = st.secrets["SMTP_SERVER"]
+    SMTP_PORT = st.secrets["SMTP_PORT"]
+    SMTP_USER = st.secrets["SMTP_USER"]
+    SMTP_PASSWORD = st.secrets["SMTP_PASSWORD"]
+except:
+    SMTP_SERVER = ""
+    SMTP_PORT = 587
+    SMTP_USER = ""
+    SMTP_PASSWORD = ""
+
+def send_license_email(to_email, license_key, plan_name, uses, expiry, lang="zh"):
+    """发送授权码邮件，支持中英文（静默失败）"""
+    if not SMTP_USER or not SMTP_PASSWORD:
+        return False
+    if lang == "zh":
+        subject = f"您的产品可行性分析系统授权码 - {plan_name}"
+        body = f"""
+亲爱的用户：
+
+感谢您对 Techlife 产品的信任！
+
+您的产品分析报告通行证已生成，详情如下：
+
+- 授权码：{license_key}
+- 套餐：{plan_name}
+- 可用次数：{uses}
+- 有效期至：{expiry}
+
+请在系统左侧边栏的“授权码 (Report Key)”输入框中输入此授权码，即可解锁高级功能（无水印、可下载 Word 报告）。
+
+请妥善保管此授权码，如有疑问请联系：nc.ku@hotmail.com
+
+祝您使用愉快！
+
+Techlife 产品可行性分析系统
+"""
+    else:
+        subject = f"Your License Key for Product Feasibility Analysis System - {plan_name}"
+        body = f"""
+Dear Customer,
+
+Thank you for trusting Techlife products!
+
+Your product analysis report pass has been generated. Details are as follows:
+
+- License Key: {license_key}
+- Plan: {plan_name}
+- Available uses: {uses}
+- Valid until: {expiry}
+
+Please enter this license key in the "Report Key" input box on the left sidebar to unlock advanced features (no watermark, Word report download available).
+
+Please keep this license key safe. If you have any questions, please contact: nc.ku@hotmail.com
+
+Best regards,
+
+Techlife Product Feasibility Analysis System
+"""
+    msg = MIMEMultipart()
+    msg['From'] = SMTP_USER
+    msg['To'] = to_email
+    msg['Subject'] = Header(subject, 'utf-8')
+    msg.attach(MIMEText(body, 'plain', 'utf-8'))
+    try:
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(SMTP_USER, SMTP_PASSWORD)
+        server.sendmail(SMTP_USER, [to_email], msg.as_string())
+        server.quit()
+        return True
+    except Exception:
+        return False
 
 # ================== 授权类型定义 ==================
 LICENSE_TYPES = {
@@ -87,7 +167,6 @@ if "current_license_type" not in st.session_state:
     st.session_state.current_license_type = None
 
 def activate_license(report_key):
-    """激活或加载授权信息，返回 (是否有效, 剩余次数, 有效期字符串, 类型)"""
     if report_key in st.session_state.usage_db:
         record = st.session_state.usage_db[report_key]
         remaining = record["remaining"]
@@ -136,7 +215,6 @@ def is_premium_user(report_key):
     return False
 
 def generate_report_key(license_type, custom_uses=None, custom_months=None):
-    """生成随机 Report Key，并写入 usage_db"""
     random_str = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
     new_key = f"{license_type.upper()}_{random_str}"
     if license_type == "custom":
@@ -430,7 +508,7 @@ with col4:
         else:
             admin_login_dialog()
 
-# ================== 语言文本 ==================
+# ================== 语言文本（完整版，从原文件中提取） ==================
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -450,15 +528,7 @@ TEXTS = {
         "remaining_label": "剩余次数",
         "expiry_label": "有效期至",
         "contact_info": "📞 **联系人：古生**  \n✉️ 电邮: nc.ku@hotmail.com  \n📱 电话/微信: +86-13823760640",
-        "purchase_title": "💰 购买报告次数",
-        "purchase_table": """
-| 套餐 | 价格 | 次数 | 有效期 |
-|------|------|------|--------|
-| 单次通行 | 18元 / 3美元 | 1次 | 无限制 |
-| 100次套餐 | 180元 / 30美元 | 100次 | 1个月 |
-| 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
-""",
-        "purchase_contact": "请通过以下方式联系我们购买，付款后我们会为您生成授权码：\n\n📧 nc.ku@hotmail.com\n📱 +86-13823760640",
+        "purchase_title": "💰 购买+解锁",
         "input_title": "📝 产品信息输入",
         "basic_info": "基本信息",
         "product_name": "产品名称",
@@ -496,6 +566,7 @@ TEXTS = {
         "report_title": "📄 生成的可行性分析报告",
         "download_section": "📥 下载报告",
         "download_btn": "下载 Word 文档",
+        "download_unlock_btn": "📥 下载报告+解锁",
         "key_error": "授权码无效或已过期",
         "back_btn": "← 返回重新填写",
         "footer": "© 2026 Laurence Ku | AI产品可行性分析系统 | 基于25年研发管理经验",
@@ -646,15 +717,7 @@ TEXTS = {
         "remaining_label": "Remaining uses",
         "expiry_label": "Valid until",
         "contact_info": "📞 **Contact: Laurence Ku**  \n✉️ Email: nc.ku@hotmail.com  \n📱 Phone/Wechat: +86-13823760640",
-        "purchase_title": "💰 Purchase Report/Download",
-        "purchase_table": """
-| Plan | Price | Pass | Validity |
-|------|-------|---------|----------|
-| Single Pass | 18 RMB / $3 | 1 | Unlimited |
-| 100 Pass | 180 RMB / $30 | 100 | 1 month |
-| 1200 Pass | 1200 RMB / $200 | 1200 | 12 months |
-""",
-        "purchase_contact": "Please contact us to purchase. After payment, we will generate a license key for you:\n\n📧 nc.ku@hotmail.com\n📱 +86-13823760640",
+        "purchase_title": "💰 Purchase + Unlock",
         "input_title": "📝 Product Information Input",
         "basic_info": "Basic Information",
         "product_name": "Product Name",
@@ -692,6 +755,7 @@ TEXTS = {
         "report_title": "📄 Generated Feasibility Analysis Report",
         "download_section": "📥 Download Report",
         "download_btn": "Download Word Document",
+        "download_unlock_btn": "📥 Download Report + Unlock",
         "key_error": "Invalid or expired Report Key",
         "back_btn": "← Back to re-enter",
         "footer": "© 2026 Laurence Ku | AI Product Feasibility System | Based on 25+ years R&D experience",
@@ -831,21 +895,110 @@ lang = st.session_state.lang
 t = TEXTS[lang]
 
 st.title(t["title"])
-# 如果处于生成状态，添加脉冲动画
-if st.session_state.pulse_active:
+
+# ================== 支付回调处理（修复复制按钮和手动返回） ==================
+params = st.query_params
+if "order_success" in params and "plan" in params:
+    plan = params["plan"]
+    customer_email = params.get("email", None)
+    current_lang = st.session_state.lang
+    
+    if current_lang == "zh":
+        if plan == "single":
+            uses = 1
+            months = 9999
+            plan_name = "单次通行"
+        elif plan == "100":
+            uses = 100
+            months = 1
+            plan_name = "100次套餐"
+        elif plan == "1200":
+            uses = 1200
+            months = 12
+            plan_name = "1200次套餐"
+        else:
+            uses = 0
+            months = 0
+            plan_name = "未知"
+    else:
+        if plan == "single":
+            uses = 1
+            months = 9999
+            plan_name = "Single Pass"
+        elif plan == "100":
+            uses = 100
+            months = 1
+            plan_name = "100 Credits"
+        elif plan == "1200":
+            uses = 1200
+            months = 12
+            plan_name = "1200 Credits"
+        else:
+            uses = 0
+            months = 0
+            plan_name = "Unknown"
+    
+    if uses > 0:
+        new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
+        st.session_state.current_report_key = new_key
+        
+        # 发送邮件（静默）
+        if customer_email:
+            send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
+        
+        # 显示成功消息和复制按钮（增强复制功能）
+        st.success(f"✅ 支付成功！您的授权码已生成并自动填入下方输入框。")
+        
+        # 使用自定义 HTML + JavaScript 确保复制功能正常
+        copy_js = f"""
+        <div style="background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin-top: 10px;">
+            <code id="license-key" style="font-size: 16px;">{new_key}</code>
+            <button id="copy-btn" style="margin-left: 10px;">📋 复制授权码</button>
+        </div>
+        <p style="margin-top: 10px;">⚠️ 请务必保存好此授权码，下次使用时可复制粘贴到左侧输入框。</p>
+        <script>
+            document.getElementById('copy-btn').addEventListener('click', function() {{
+                const code = document.getElementById('license-key').innerText;
+                navigator.clipboard.writeText(code).then(function() {{
+                    alert('授权码已复制到剪贴板！');
+                }}, function(err) {{
+                    alert('复制失败，请手动复制。');
+                }});
+            }});
+        </script>
+        """
+        st.markdown(copy_js, unsafe_allow_html=True)
+        
+        # 显示手动返回按钮，不自动刷新
+        if st.button("✅ 返回并继续使用"):
+            st.query_params.clear()
+            st.rerun()
+    else:
+        st.error("❌ 支付失败或套餐无效，请联系客服。")
+        st.query_params.clear()
+
+# ================== 支付对话框 ==================
+@st.dialog("购买+解锁")
+def purchase_dialog():
+    st.markdown("### 选择套餐")
     st.markdown("""
-    <style>
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(0, 123, 255, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0); }
-        }
-        .stButton button {
-            animation: pulse 1.5s infinite;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-st.markdown("---")
+| 套餐 | 价格 | 次数 | 有效期 |
+|------|------|------|--------|
+| 单次通行 | 18元 / 3美元 | 1次 | 无限制 |
+| 100次套餐 | 180元 / 30美元 | 100次 | 1个月 |
+| 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
+""")
+    st.markdown("#### 🌍 国际支付（Stripe）")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/test_9B67sL0Wh7298Nuaxk8og00")
+    with col2:
+        st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/9B6cN5bAVcmt5Bi7l88og02")
+    with col3:
+        st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/9B67sL0Wh7298Nuaxk8og00")
+    st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
+    st.info("国内支付即将开放，敬请期待。")
+    st.markdown("支付成功后会自动跳回本页面，授权码将自动填入并激活。")
 
 # ================== 侧边栏 ==================
 with st.sidebar:
@@ -878,11 +1031,29 @@ with st.sidebar:
     st.markdown("---")
     st.markdown(t["contact_info"])
     st.markdown("---")
-    # 购买引导（根据语言动态显示）
+    
+    # ================== 购买引导（侧边栏） ==================
     st.markdown(f"## {t['purchase_title']}")
-    st.markdown(t["purchase_table"])
-    st.info(t["purchase_contact"])
+    st.markdown("""
+| 套餐 | 价格 | 次数 | 有效期 |
+|------|------|------|--------|
+| 单次通行 | 18元 / 3美元 | 1次 | 无限制 |
+| 100次套餐 | 180元 / 30美元 | 100次 | 1个月 |
+| 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
+""")
+    st.markdown("#### 🌍 国际支付（Stripe）")
+    col_s1, col_s2, col_s3 = st.columns(3)
+    with col_s1:
+        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/test_9B67sL0Wh7298Nuaxk8og00")
+    with col_s2:
+        st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/9B6cN5bAVcmt5Bi7l88og02")
+    with col_s3:
+        st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/9B67sL0Wh7298Nuaxk8og00")
+    st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
+    st.info("国内支付即将开放，敬请期待。")
+    st.info("支付成功后会自动跳回本页面，授权码将自动填入并激活。")
     st.markdown("---")
+    
     st.markdown(f"## {t['sidebar_title']}")
     st.markdown(t["sidebar_basis"])
     for item in t["basis_items"]:
@@ -945,7 +1116,6 @@ col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
 with col_btn2:
     submitted = st.button(t["submit_btn"], type="primary", use_container_width=True)
 
-# 创建一个空容器，用于显示加载动画和文字（位于按钮下方）
 spinner_placeholder = st.empty()
 
 # ================== 报告生成逻辑 ==================
@@ -965,15 +1135,11 @@ if submitted:
         else:
             can_generate = True
         if can_generate:
-            # 开启脉冲动画
             st.session_state.pulse_active = True
             with spinner_placeholder.container():
-                # 在按钮下方显示居中文字
                 st.markdown(f'<div style="text-align: center; margin-top: 10px;">{t["generating"]}</div>', unsafe_allow_html=True)
-                # 使用空文本的 spinner，只显示奔跑小人动画（默认在右上角）
                 with st.spinner(""):
                     try:
-                        # 构建分析人信息
                         if analyst_name:
                             if analyst_title:
                                 analyst_info = f"{analyst_name} ({analyst_title})"
@@ -1004,7 +1170,6 @@ if submitted:
                         )
                         report_content = response.choices[0].message.content
                         
-                        # 获取当前日期
                         if lang == "zh":
                             current_date = datetime.now().strftime("%Y年%m月%d日")
                             report_content = re.sub(r'\d{4}年\d{1,2}月\d{1,2}日', current_date, report_content)
@@ -1014,17 +1179,12 @@ if submitted:
                             report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
                             report_content = re.sub(r'[A-Z][a-z]+ \d{1,2}, \d{4}', current_date, report_content)
                         
-                        # 替换占位符
                         report_content = report_content.replace("{{CURRENT_DATE}}", current_date)
                         report_content = report_content.replace("{{ANALYST_INFO}}", analyst_info)
-                        
-                        # 强制替换分析人表格行
                         if lang == "zh":
                             report_content = re.sub(r'(\| 分析人 \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
                         else:
                             report_content = re.sub(r'(\| Analyst \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
-                        
-                        # 移除所有星号
                         report_content = re.sub(r'\*+', '', report_content)
                         
                         if lang == "zh":
@@ -1032,7 +1192,6 @@ if submitted:
                         else:
                             st.session_state.report_content_en = report_content
                         
-                        # 关闭脉冲动画并刷新页面显示报告
                         st.session_state.pulse_active = False
                         st.rerun()
                     except Exception as e:
@@ -1069,7 +1228,8 @@ if current_report:
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
     else:
-        st.warning("请联系 nc.ku@hotmail.com 获取完整报告。")
+        if st.button(t["download_unlock_btn"], use_container_width=True):
+            purchase_dialog()
     
     if st.button(t["back_btn"]):
         if lang == "zh":
