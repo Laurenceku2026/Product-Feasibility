@@ -911,6 +911,7 @@ st.title(t["title"])
 # ================== 支付回调处理（修复复制按钮，保留报告） ==================
 # ================== 支付回调处理（独立成功页面，返回后保留报告并解锁） ==================
 # ================== 支付回调处理（独立成功页面，返回时自动解锁） ==================
+# ================== 支付回调处理（自动激活，保留报告） ==================
 params = st.query_params
 if "order_success" in params and "plan" in params:
     plan = params["plan"]
@@ -954,28 +955,30 @@ if "order_success" in params and "plan" in params:
     
     if uses > 0:
         new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
-        st.session_state.current_report_key = new_key
         
+        # 发送邮件（静默）
         if customer_email:
             send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
         
-        # 独立成功页面
-        st.set_page_config(page_title="支付成功", page_icon="✅")
-        st.title("✅ 支付成功")
-        st.markdown(f"### 您已成功购买 **{plan_name}**")
-        st.markdown("您的授权码已生成：")
-        st.code(new_key, language="text")
-        st.caption("⚠️ 请务必保存好此授权码，下次使用时可复制粘贴到左侧输入框。")
-        st.info("点击下方按钮返回应用，授权码将自动生效，报告水印将解除。")
+        # 自动激活授权码
+        valid, remaining, expiry_str, lic_type = activate_license(new_key)
+        if valid:
+            st.session_state.current_report_key = new_key
+            st.session_state.current_license_type = lic_type
+            st.success(f"✅ 支付成功！您已购买 **{plan_name}**，授权码已自动激活。")
+            st.markdown("您的授权码：")
+            st.code(new_key, language="text")
+            st.caption("⚠️ 请妥善保管此授权码，以备下次使用。")
+        else:
+            st.error("授权码激活失败，请联系客服。")
         
-        # 返回链接：携带授权码参数，让主页自动识别并激活
-        st.link_button("🏠 返回应用", f"/?auto_activate={new_key}", type="primary")
-        
-        st.stop()
+        # 清除 URL 参数，避免刷新重复处理
+        st.query_params.clear()
+        # 刷新页面以更新侧边栏显示和报告水印状态（报告内容不会丢失）
+        st.rerun()
     else:
         st.error("❌ 支付失败或套餐无效，请联系客服。")
-        st.query_params.clear()
-        st.stop()
+        st.query_params.clear()        st.stop()
 # ================== 支付对话框 ==================
 @st.dialog("购买+解锁")
 def purchase_dialog():
