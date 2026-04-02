@@ -955,16 +955,13 @@ if "order_success" in params and "plan" in params:
     if uses > 0:
         new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
         
-        # 发送邮件（静默）
         if customer_email:
             send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
         
-        # 自动填入侧边栏并激活
         st.session_state.current_report_key = new_key
         valid, remaining, expiry_str, lic_type = activate_license(new_key)
         if valid:
             st.session_state.current_license_type = lic_type
-            # 在当前页面顶部显示成功消息（不跳转）
             st.success(f"✅ 支付成功！您已购买 **{plan_name}**，授权码已自动激活。")
             st.markdown("您的授权码：")
             st.code(new_key, language="text")
@@ -972,14 +969,11 @@ if "order_success" in params and "plan" in params:
         else:
             st.error("授权码激活失败，请联系客服。")
         
-        # 清除 URL 参数，避免刷新重复处理
         st.query_params.clear()
-        # 刷新页面以更新侧边栏显示和报告水印状态（报告内容不会丢失）
         st.rerun()
     else:
         st.error("❌ 支付失败或套餐无效，请联系客服。")
         st.query_params.clear()
-        st.stop()
 # ================== 支付对话框 ==================
 @st.dialog("购买+解锁")
 def purchase_dialog():
