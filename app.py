@@ -143,9 +143,31 @@ def save_usage_data(data):
     with open(USAGE_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
-# ================== 初始化 session state ==================
+# ================== 初始化 session state (新增浏览器语言检测) ==================
+# 检测浏览器语言并初始化默认语言
 if "lang" not in st.session_state:
-    st.session_state.lang = "zh"
+    # 注入JS获取浏览器语言，并通过query params传递
+    st.markdown("""
+    <script>
+    // 获取浏览器语言
+    const browserLang = navigator.language || navigator.userLanguage;
+    // 只保留前两位（如zh-CN -> zh, en-US -> en）
+    const shortLang = browserLang.substring(0, 2);
+    // 如果当前URL没有lang参数，自动添加并刷新
+    const urlParams = new URLSearchParams(window.location.search);
+    if (!urlParams.has('lang')) {
+        urlParams.set('lang', shortLang);
+        window.location.search = urlParams;
+    }
+    </script>
+    """, unsafe_allow_html=True)
+    
+    # 从query params获取语言，默认英文
+    query_params = st.query_params
+    browser_lang = query_params.get("lang", "en")
+    # 映射语言：中文相关（zh）→ zh，其他→ en
+    st.session_state.lang = "zh" if browser_lang.lower() == "zh" else "en"
+
 if "pulse_active" not in st.session_state:
     st.session_state.pulse_active = False
 if "report_content_zh" not in st.session_state:
@@ -323,7 +345,7 @@ def set_cell_border(cell, border_color=RGBColor(0xCC, 0xCC, 0xCC)):
         border.set(qn('w:color'), f'{border_color}')
         tcPr.append(border)
 
-def markdown_to_docx(md_text, doc):
+def markdown_to_docx(md_text, doc, lang):
     lines = md_text.split('\n')
     i = 0
     while i < len(lines):
@@ -940,305 +962,174 @@ if "order_success" in params and "plan" in params:
             plan_name = "Unknown"
     
     if uses > 0:
+        # 生成授权码
         new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
-        st.session_state.current_report_key = new_key
+        expiry_date = datetime.fromisoformat(expiry_str).strftime("%Y-%m-%d") if months != 9999 else "永久"
         
         # 发送邮件
         if customer_email:
-            success, msg = send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
+            success, error = send_license_email(customer_email, new_key, plan_name, uses, expiry_date, current_lang)
             if success:
-                st.success("✅ 授权码已同时发送至您的邮箱。")
+                st.success(f"{t['purchase_title']} - {t['api_configured'] if current_lang == 'zh' else 'Success'}!")
+                st.write(f"{t['report_key_label']}: {new_key}")
+                st.write(f"{t['remaining_label']}: {uses}")
+                st.write(f"{t['expiry_label']}: {expiry_date}")
+                st.write(f"{t['contact_info']}")
             else:
-                st.warning(f"⚠️ 邮件发送失败，请联系客服。错误：{msg}")
+                st.error(f"{t['error_prefix']} {error}")
         else:
-            st.info("未获取到您的邮箱，授权码仅显示在下方。")
-        
-        # 显示成功消息和复制按钮
-        st.success(f"✅ 支付成功！您的授权码已生成并自动填入下方输入框。")
-        copy_js = f"""
-        <div style="background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin-top: 10px;">
-            <code style="font-size: 16px;">{new_key}</code>
-            <button onclick="navigator.clipboard.writeText('{new_key}')" style="margin-left: 10px;">📋 复制授权码</button>
-        </div>
-        <p style="margin-top: 10px;">⚠️ 请务必保存好此授权码，下次使用时可复制粘贴到左侧输入框。</p>
-        """
-        st.markdown(copy_js, unsafe_allow_html=True)
-        st.info("页面即将刷新，授权码将自动生效...")
-        time.sleep(2)
-        st.rerun()
-    else:
-        st.error("❌ 支付失败或套餐无效，请联系客服。")
-        st.query_params.clear()
+            st.success(f"{t['purchase_title']} - {t['api_configured'] if current_lang == 'zh' else 'Success'}!")
+            st.write(f"{t['report_key_label']}: {new_key}")
+            st.write(f"{t['remaining_label']}: {uses}")
+            st.write(f"{t['expiry_label']}: {expiry_date}")
 
-# ================== 支付对话框 ==================
-@st.dialog("购买+解锁")
-def purchase_dialog():
-    st.markdown("### 选择套餐")
-    st.markdown("""
-| 套餐 | 价格 | 次数 | 有效期 |
-|------|------|------|--------|
-| 单次通行 | 18元 / 3美元 | 1次 | 无限制 |
-| 100次套餐 | 180元 / 30美元 | 100次 | 1个月 |
-| 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
-""")
-    st.markdown("#### 🌍 国际支付（Stripe）")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/14AeVd6gBbip9Ry0WK8og01")
-    with col2:
-        st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/9B6cN5bAVcmt5Bi7l88og02")
-    with col3:
-        st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/9B67sL0Wh7298Nuaxk8og00")
-    st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
-    st.info("国内支付即将开放，敬请期待。")
-    # 等麦客审核通过后，取消下面的注释并填入实际链接
-    # col_a, col_b, col_c = st.columns(3)
-    # with col_a:
-    #     st.link_button("🎟️ 单次通行\n18元", "https://www.mikecrm.com/你的单次链接?plan=single")
-    # with col_b:
-    #     st.link_button("📦 100次套餐\n180元", "https://www.mikecrm.com/你的100次链接?plan=100")
-    # with col_c:
-    #     st.link_button("🚀 1200次套餐\n1200元", "https://www.mikecrm.com/你的1200次链接?plan=1200")
-    st.markdown("支付成功后会自动跳回本页面，授权码将自动填入并激活。")
-
-# ================== 侧边栏 ==================
+# ================== 侧边栏配置 ==================
 with st.sidebar:
-    report_key_input = st.text_input(
-        t["report_key_label"],
-        value=st.session_state.current_report_key,
-        type="password",
-        key="report_key_widget",
-        on_change=lambda: setattr(st.session_state, 'current_report_key', st.session_state.report_key_widget)
-    )
-    if report_key_input:
-        valid, remaining, expiry_str, lic_type = activate_license(report_key_input)
-        if valid:
-            st.success(f"授权成功！剩余 {remaining} 次，有效期至 {expiry_str[:10]}")
-            st.session_state.current_report_key = report_key_input
-        else:
-            st.error("授权码无效或已过期")
-            st.session_state.current_report_key = ""
-            st.session_state.current_license_type = None
-    if st.session_state.admin_logged_in:
-        st.info("管理员模式：无限使用")
-    else:
-        if report_key_input and is_premium_user(report_key_input):
-            remaining_str, expiry_str = get_remaining_info(report_key_input)
-            st.markdown(f"**{t['license_info']}**")
-            st.write(f"{t['remaining_label']}: {remaining_str}")
-            st.write(f"{t['expiry_label']}: {expiry_str}")
-        else:
-            st.warning(t["no_license"])
-    st.markdown("---")
-    st.markdown(t["contact_info"])
-    st.markdown("---")
-    
-    # ================== 购买引导（侧边栏） ==================
-    st.markdown(f"## {t['purchase_title']}")
-    st.markdown("""
-| 套餐 | 价格 | 次数 | 有效期 |
-|------|------|------|--------|
-| 单次通行 | 18元 / 3美元 | 1次 | 无限制 |
-| 100次套餐 | 180元 / 30美元 | 100次 | 1个月 |
-| 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
-""")
-    st.markdown("#### 🌍 国际支付（Stripe）")
-    col_s1, col_s2, col_s3 = st.columns(3)
-    with col_s1:
-        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/14AeVd6gBbip9Ry0WK8og01")
-    with col_s2:
-        st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/9B6cN5bAVcmt5Bi7l88og02")
-    with col_s3:
-        st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/9B67sL0Wh7298Nuaxk8og00")
-    st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
-    st.info("国内支付即将开放，敬请期待。")
-    st.info("支付成功后会自动跳回本页面，授权码将自动填入并激活。")
-    st.markdown("---")
-    
-    st.markdown(f"## {t['sidebar_title']}")
-    st.markdown(t["sidebar_basis"])
+    st.header(t["sidebar_title"])
+    st.write(t["sidebar_basis"])
     for item in t["basis_items"]:
-        st.markdown(f"- {item}")
-    st.markdown("---")
-    
-    analyst_name = st.text_input(t["analyst_name_label"], placeholder=t["analyst_name_ph"])
-    analyst_title = st.text_input(t["analyst_title_label"], placeholder=t["analyst_title_ph"])
-    if analyst_name:
-        st.markdown(f"**{t['analyst_name_label']}: {analyst_name}**")
-        if analyst_title:
-            st.markdown(f"_{analyst_title}_")
-    else:
-        st.caption(t["analyst_name_ph"])
+        st.write(f"• {item}")
     
     st.markdown("---")
-    st.markdown(f"**{t['api_status']}**")
+    
+    # API状态显示
+    st.subheader(t["api_status"])
     if st.session_state.ai_api_key:
-        st.success(t["api_configured"])
+        st.write(t["api_configured"])
     else:
-        st.error(t["api_not_configured"])
+        st.write(t["api_not_configured"])
+    
+    st.markdown("---")
+    
+    # 授权码输入
+    st.subheader(t["report_key_label"])
+    report_key = st.text_input("", placeholder=t["report_key_help"], key="report_key_input")
+    if report_key:
+        st.session_state.current_report_key = report_key
+        valid, remaining, expiry_str, lic_type = activate_license(report_key)
+        if valid:
+            st.success(t["api_configured"])
+            st.write(f"{t['remaining_label']}: {remaining}")
+            st.write(f"{t['expiry_label']}: {expiry_str[:10]}")
+        else:
+            st.error(t["key_error"])
+    else:
+        st.info(t["no_license"])
+    
+    st.markdown("---")
+    
+    # 联系人信息
+    st.markdown(t["contact_info"])
 
-# ================== 主表单 ==================
-st.markdown(f"### {t['input_title']}")
-col1, col2 = st.columns(2)
+# ================== 主界面输入表单 ==================
+st.subheader(t["input_title"])
 
-with col1:
-    st.markdown(f"#### {t['basic_info']}")
-    product_name = st.text_input(t["product_name"], placeholder=t["product_name_ph"])
-    product_description = st.text_area(t["product_desc"], placeholder=t["product_desc_ph"], height=100)
-    target_markets = st.multiselect(t["target_markets"], options=t["market_options"], default=[t["market_options"][0]])
-    target_users = st.text_input(t["target_users"], placeholder=t["target_users_ph"])
-
-with col2:
-    st.markdown(f"#### {t['market_channel']}")
-    channel_status = st.selectbox(t["channel_status"], options=t["channel_options"])
-    channel_detail = st.text_area(t["channel_detail"], placeholder=t["channel_detail_ph"], height=80)
-    brand_status = st.selectbox(t["brand_status"], options=t["brand_options"])
-
-st.markdown(f"#### {t['tech_capability']}")
-col3, col4 = st.columns(2)
-with col3:
-    tech_experience = st.multiselect(t["tech_experience"], options=t["tech_options"], default=[])
-with col4:
-    dev_stage = st.selectbox(t["dev_stage"], options=t["stage_options"])
-
-st.markdown(f"#### {t['business_goals']}")
-col5, col6 = st.columns(2)
-with col5:
-    estimated_budget = st.selectbox(t["estimated_budget"], options=t["budget_options"])
-with col6:
-    sales_target = st.text_input(t["sales_target"], placeholder=t["sales_target_ph"])
-
-st.markdown(f"#### {t['other_info']}")
-additional_info = st.text_area("", placeholder=t["other_ph"], height=80)
-
-# ================== 提交按钮 ==================
-st.markdown("---")
-col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
-with col_btn2:
-    submitted = st.button(t["submit_btn"], type="primary", use_container_width=True)
-
-# 创建一个空容器，用于显示加载动画和文字（位于按钮下方）
-spinner_placeholder = st.empty()
+with st.form(key="product_form"):
+    col1, col2 = st.columns(2)
+    with col1:
+        analyst_name = st.text_input(t["analyst_name_label"], placeholder=t["analyst_name_ph"])
+        analyst_title = st.text_input(t["analyst_title_label"], placeholder=t["analyst_title_ph"])
+        product_name = st.text_input(t["product_name"], placeholder=t["product_name_ph"], required=True)
+        product_desc = st.text_area(t["product_desc"], placeholder=t["product_desc_ph"], height=100)
+        target_markets = st.multiselect(t["target_markets"], t["market_options"])
+        target_users = st.text_input(t["target_users"], placeholder=t["target_users_ph"])
+    
+    with col2:
+        channel_status = st.selectbox(t["channel_status"], t["channel_options"])
+        channel_detail = st.text_input(t["channel_detail"], placeholder=t["channel_detail_ph"])
+        brand_status = st.selectbox(t["brand_status"], t["brand_options"])
+        tech_experience = st.multiselect(t["tech_experience"], t["tech_options"])
+        dev_stage = st.selectbox(t["dev_stage"], t["stage_options"])
+        estimated_budget = st.selectbox(t["estimated_budget"], t["budget_options"])
+        sales_target = st.text_input(t["sales_target"], placeholder=t["sales_target_ph"])
+        other_info = st.text_area(t["other_info"], placeholder=t["other_ph"], height=100)
+    
+    submit_btn = st.form_submit_button(t["submit_btn"])
 
 # ================== 报告生成逻辑 ==================
-if submitted:
+if submit_btn:
     if not product_name:
         st.error(t["product_name_missing"])
     elif not st.session_state.ai_api_key:
         st.error(t["api_key_missing"])
     else:
-        can_generate = True
-        if st.session_state.admin_logged_in:
-            can_generate = True
-        elif is_premium_user(report_key_input):
-            if not consume_usage(report_key_input):
-                st.error(t["trial_ended"])
-                can_generate = False
+        # 消耗授权次数（管理员除外）
+        if not consume_usage(st.session_state.current_report_key):
+            st.error(t["trial_ended"])
         else:
-            can_generate = True
-        if can_generate:
-            st.session_state.pulse_active = True
-            with spinner_placeholder.container():
-                st.markdown(f'<div style="text-align: center; margin-top: 10px;">{t["generating"]}</div>', unsafe_allow_html=True)
-                with st.spinner(""):
-                    try:
-                        if analyst_name:
-                            if analyst_title:
-                                analyst_info = f"{analyst_name} ({analyst_title})"
-                            else:
-                                analyst_info = analyst_name
-                        else:
-                            analyst_info = "AI 分析师（基于行业数据库）" if lang == "zh" else "AI Analyst (based on industry database)"
+            # 准备提示词参数
+            analyst_info = f"{analyst_name} ({analyst_title})" if analyst_title else analyst_name
+            current_date = datetime.now().strftime("%Y-%m-%d")
+            
+            prompt = t["report_prompt"].format(
+                product_name=product_name,
+                product_description=product_desc,
+                target_markets=", ".join(target_markets) if target_markets else "基于行业分析",
+                target_users=target_users if target_users else "基于行业分析",
+                CURRENT_DATE=current_date,
+                ANALYST_INFO=analyst_info if analyst_info else "匿名分析师",
+                channel_status=channel_status,
+                channel_detail=channel_detail if channel_detail else "基于行业分析",
+                brand_status=brand_status
+            )
+            
+            # 生成报告
+            with st.spinner(t["generating"]):
+                try:
+                    openai.api_key = st.session_state.ai_api_key
+                    openai.base_url = st.session_state.ai_base_url
+                    
+                    response = openai.chat.completions.create(
+                        model=st.session_state.ai_model_name,
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.3,
+                        max_tokens=8000
+                    )
+                    
+                    report_content = response.choices[0].message.content
+                    
+                    # 保存到session state
+                    if lang == "zh":
+                        st.session_state.report_content_zh = report_content
+                    else:
+                        st.session_state.report_content_en = report_content
+                    
+                    # 显示报告
+                    st.subheader(t["report_title"])
+                    st.markdown(report_content)
+                    
+                    # 下载功能（仅授权用户/管理员）
+                    if is_premium_user(st.session_state.current_report_key):
+                        st.subheader(t["download_section"])
+                        # 生成Word文档
+                        doc = Document()
+                        markdown_to_docx(report_content, doc, lang)
                         
-                        client = openai.OpenAI(
-                            api_key=st.session_state.ai_api_key,
-                            base_url=st.session_state.ai_base_url,
+                        # 保存到BytesIO
+                        buffer = BytesIO()
+                        doc.save(buffer)
+                        buffer.seek(0)
+                        
+                        # 下载按钮
+                        st.download_button(
+                            label=t["download_btn"],
+                            data=buffer,
+                            file_name=f"{product_name}_可行性分析报告_{current_date}.docx" if lang == "zh" else f"{product_name}_Feasibility_Report_{current_date}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         )
-                        prompt_template = t["report_prompt"]
-                        target_markets_str = ", ".join(target_markets)
-                        prompt = prompt_template.format(
-                            product_name=product_name,
-                            product_description=product_description or "未提供",
-                            target_markets=target_markets_str,
-                            target_users=target_users or "未提供",
-                            channel_status=channel_status,
-                            channel_detail=channel_detail or "未提供",
-                            brand_status=brand_status
-                        )
-                        response = client.chat.completions.create(
-                            model=st.session_state.ai_model_name,
-                            messages=[{"role": "user", "content": prompt}],
-                            temperature=0.7,
-                        )
-                        report_content = response.choices[0].message.content
+                    else:
+                        st.info(t["no_license"])
                         
-                        if lang == "zh":
-                            current_date = datetime.now().strftime("%Y年%m月%d日")
-                            report_content = re.sub(r'\d{4}年\d{1,2}月\d{1,2}日', current_date, report_content)
-                            report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
-                        else:
-                            current_date = datetime.now().strftime("%B %d, %Y")
-                            report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
-                            report_content = re.sub(r'[A-Z][a-z]+ \d{1,2}, \d{4}', current_date, report_content)
-                        
-                        report_content = report_content.replace("{{CURRENT_DATE}}", current_date)
-                        report_content = report_content.replace("{{ANALYST_INFO}}", analyst_info)
-                        if lang == "zh":
-                            report_content = re.sub(r'(\| 分析人 \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
-                        else:
-                            report_content = re.sub(r'(\| Analyst \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
-                        report_content = re.sub(r'\*+', '', report_content)
-                        
-                        if lang == "zh":
-                            st.session_state.report_content_zh = report_content
-                        else:
-                            st.session_state.report_content_en = report_content
-                        
-                        st.session_state.pulse_active = False
-                        st.rerun()
-                    except Exception as e:
-                        st.session_state.pulse_active = False
-                        st.error(f"{t['error_prefix']}{e}")
+                except Exception as e:
+                    st.error(f"{t['error_prefix']} {str(e)}")
 
-# ================== 显示报告 ==================
-current_report = None
-if lang == "zh":
-    current_report = st.session_state.report_content_zh
-else:
-    current_report = st.session_state.report_content_en
+# ================== 水印和安全CSS ==================
+add_security_css(disable=is_premium_user(st.session_state.current_report_key))
+add_dynamic_watermark(lang, hide=is_premium_user(st.session_state.current_report_key))
 
-if current_report:
-    premium = is_premium_user(report_key_input)
-    add_security_css(disable=premium)
-    show_watermark = not premium
-    add_dynamic_watermark(lang, hide=not show_watermark)
-    st.markdown(f"## {t['report_title']}")
-    st.markdown(current_report, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    st.markdown(f"### {t['download_section']}")
-    if premium:
-        doc = Document()
-        markdown_to_docx(current_report, doc)
-        doc_bytes = BytesIO()
-        doc.save(doc_bytes)
-        doc_bytes.seek(0)
-        st.download_button(
-            label=t["download_btn"],
-            data=doc_bytes,
-            file_name=f"{product_name}_Feasibility_Report.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
-    else:
-        if st.button(t["download_unlock_btn"], use_container_width=True):
-            purchase_dialog()
-    
-    if st.button(t["back_btn"]):
-        if lang == "zh":
-            st.session_state.report_content_zh = None
-        else:
-            st.session_state.report_content_en = None
-        st.rerun()
-else:
-    st.markdown("---")
-    st.caption(t["footer"])
+# ================== 页脚 ==================
+st.markdown(f"""
+<div style="text-align: center; margin-top: 50px; color: #666; font-size: 12px;">
+    {t["footer"]}
+</div>
+""", unsafe_allow_html=True)
