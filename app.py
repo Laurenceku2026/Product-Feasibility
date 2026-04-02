@@ -938,7 +938,7 @@ with st.sidebar:
     with col_s1:
         st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/你的单次链接?plan=single")
     with col_s2:
-        st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/你的100次链接?plan=100")
+        st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/9B6cN5bAVcmt5Bi7l88og02")
     with col_s3:
         st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/你的1200次链接?plan=1200")
     st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
