@@ -901,13 +901,13 @@ st.title(t["title"])
 # ================== 支付回调处理（修复复制按钮，保留报告） ==================
 # ================== 支付回调处理（修复复制按钮，保留报告） ==================
 # ================== 支付回调处理（独立成功页面，返回后保留报告并解锁） ==================
+# ================== 支付回调处理（独立成功页面，返回时自动解锁） ==================
 params = st.query_params
 if "order_success" in params and "plan" in params:
     plan = params["plan"]
     customer_email = params.get("email", None)
     current_lang = st.session_state.lang
     
-    # 根据套餐确定次数和有效期
     if current_lang == "zh":
         if plan == "single":
             uses = 1
@@ -947,11 +947,10 @@ if "order_success" in params and "plan" in params:
         new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
         st.session_state.current_report_key = new_key
         
-        # 发送邮件（静默）
         if customer_email:
             send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
         
-        # ========== 独立成功页面（不显示应用主界面） ==========
+        # 独立成功页面
         st.set_page_config(page_title="支付成功", page_icon="✅")
         st.title("✅ 支付成功")
         st.markdown(f"### 您已成功购买 **{plan_name}**")
@@ -960,10 +959,9 @@ if "order_success" in params and "plan" in params:
         st.caption("⚠️ 请务必保存好此授权码，下次使用时可复制粘贴到左侧输入框。")
         st.info("点击下方按钮返回应用，授权码将自动生效，报告水印将解除。")
         
-        # 返回按钮：跳转到不带参数的主页（保留 session_state，报告不会丢失）
-        st.link_button("🏠 返回应用", "/", type="primary")
+        # 返回链接：携带授权码参数，让主页自动识别并激活
+        st.link_button("🏠 返回应用", f"/?auto_activate={new_key}", type="primary")
         
-        # 停止渲染后续内容（不显示侧边栏、表单等）
         st.stop()
     else:
         st.error("❌ 支付失败或套餐无效，请联系客服。")
