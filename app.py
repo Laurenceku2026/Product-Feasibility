@@ -875,11 +875,11 @@ def purchase_dialog():
     st.markdown("#### 🌍 国际支付（Stripe）")
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/14AeVd6gBbip9Ry0WK8og01")
+        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/你的单次链接?plan=single")
     with col2:
-        st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/9B6cN5bAVcmt5Bi7l88og02")
+        st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/你的100次链接?plan=100")
     with col3:
-        st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/9B67sL0Wh7298Nuaxk8og00")
+        st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/你的1200次链接?plan=1200")
     st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
     st.info("国内支付即将开放，敬请期待。")
     # 等麦客审核通过后，取消下面的注释并填入实际链接
@@ -935,12 +935,12 @@ with st.sidebar:
 """)
     st.markdown("#### 🌍 国际支付（Stripe）")
     col_s1, col_s2, col_s3 = st.columns(3)
-    with col1:
-        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/14AeVd6gBbip9Ry0WK8og01")
-    with col2:
-        st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/9B6cN5bAVcmt5Bi7l88og02")
-    with col3:
-        st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/9B67sL0Wh7298Nuaxk8og00")
+    with col_s1:
+        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/你的单次链接?plan=single")
+    with col_s2:
+        st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/你的100次链接?plan=100")
+    with col_s3:
+        st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/你的1200次链接?plan=1200")
     st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
     st.info("国内支付即将开放，敬请期待。")
     st.info("支付成功后会自动跳回本页面，授权码将自动填入并激活。")
