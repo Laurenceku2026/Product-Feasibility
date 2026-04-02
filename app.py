@@ -912,6 +912,7 @@ st.title(t["title"])
 # ================== 支付回调处理（独立成功页面，返回后保留报告并解锁） ==================
 # ================== 支付回调处理（独立成功页面，返回时自动解锁） ==================
 # ================== 支付回调处理（自动激活，保留报告） ==================
+# ================== 支付回调处理（自动填充授权码并激活，保留报告） ==================
 params = st.query_params
 if "order_success" in params and "plan" in params:
     plan = params["plan"]
@@ -960,10 +961,12 @@ if "order_success" in params and "plan" in params:
         if customer_email:
             send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
         
+        # 自动填入侧边栏授权码输入框
+        st.session_state.current_report_key = new_key
+        
         # 自动激活授权码
         valid, remaining, expiry_str, lic_type = activate_license(new_key)
         if valid:
-            st.session_state.current_report_key = new_key
             st.session_state.current_license_type = lic_type
             st.success(f"✅ 支付成功！您已购买 **{plan_name}**，授权码已自动激活。")
             st.markdown("您的授权码：")
