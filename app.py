@@ -946,28 +946,27 @@ if "order_success" in params and "plan" in params:
             uses = 0
             months = 0
             plan_name = "Unknown"
-    if uses > 0:
-        new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
-        st.session_state.current_report_key = new_key
-        if customer_email:
-            success, msg = send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
-            if success:
-                st.success("✅ 授权码已同时发送至您的邮箱。")
-            else:
-                st.warning(f"⚠️ 邮件发送失败，请联系客服。错误：{msg}")
+if uses > 0:
+    new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
+    st.session_state.current_report_key = new_key
+    if customer_email:
+        success, msg = send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
+        if success:
+            st.success("✅ 授权码已同时发送至您的邮箱。")
         else:
-            st.info("未获取到您的邮箱，授权码仅显示在下方。")
-# 显示成功消息和授权码（无复制按钮）
-st.success(f"✅ 支付成功！您的授权码已生成：")
-st.code(new_key, language="text")
-st.caption("请妥善保管此授权码，下次使用时可手动复制并粘贴到左侧输入框。")
-st.info("页面即将刷新，授权码将自动生效...")
-time.sleep(2)
-st.rerun()
+            st.warning(f"⚠️ 邮件发送失败，请联系客服。错误：{msg}")
     else:
-        st.error("❌ 支付失败或套餐无效，请联系客服。")
-        st.query_params.clear()
-
+        st.info("未获取到您的邮箱，授权码仅显示在下方。")
+    # 显示成功消息和授权码（无复制按钮）
+    st.success(f"✅ 支付成功！您的授权码已生成：")
+    st.code(new_key, language="text")
+    st.caption("请妥善保管此授权码，下次使用时可手动复制并粘贴到左侧输入框。")
+    st.info("页面即将刷新，授权码将自动生效...")
+    time.sleep(2)
+    st.rerun()      # ← 这里是 st.rerun()，不是 st.return()
+else:
+    st.error("❌ 支付失败或套餐无效，请联系客服。")
+    st.query_params.clear()
 # ================== 购买对话框 ==================
 @st.dialog("购买+解锁")
 def purchase_dialog():
