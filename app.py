@@ -56,10 +56,8 @@ except:
     SMTP_PASSWORD = ""
 
 def send_license_email(to_email, license_key, plan_name, uses, expiry, lang="zh"):
-    """发送授权码邮件，支持中英文"""
     if not SMTP_USER or not SMTP_PASSWORD:
         return False, "邮件服务未配置"
-    
     if lang == "zh":
         subject = f"您的产品可行性分析系统授权码 - {plan_name}"
         body = f"""
@@ -166,6 +164,8 @@ if "current_report_key" not in st.session_state:
     st.session_state.current_report_key = ""
 if "current_license_type" not in st.session_state:
     st.session_state.current_license_type = None
+if "trial_uses_left" not in st.session_state:
+    st.session_state.trial_uses_left = 3
 
 def activate_license(report_key):
     if report_key in st.session_state.usage_db:
@@ -188,7 +188,11 @@ def consume_usage(report_key):
     if st.session_state.admin_logged_in:
         return True
     if not report_key:
-        return False
+        if st.session_state.trial_uses_left > 0:
+            st.session_state.trial_uses_left -= 1
+            return True
+        else:
+            return False
     valid, remaining, expiry_str, _ = activate_license(report_key)
     if not valid:
         return False
@@ -201,11 +205,12 @@ def consume_usage(report_key):
 def get_remaining_info(report_key):
     if st.session_state.admin_logged_in:
         return "无限", "永久"
-    valid, remaining, expiry_str, _ = activate_license(report_key)
-    if not valid:
-        return "未授权", "无"
-    expiry = datetime.fromisoformat(expiry_str)
-    return str(remaining), expiry.strftime("%Y-%m-%d")
+    if report_key:
+        valid, remaining, expiry_str, _ = activate_license(report_key)
+        if valid:
+            expiry = datetime.fromisoformat(expiry_str)
+            return str(remaining), expiry.strftime("%Y-%m-%d")
+    return str(st.session_state.trial_uses_left), "试用剩余次数"
 
 def is_premium_user(report_key):
     if st.session_state.admin_logged_in:
@@ -216,8 +221,11 @@ def is_premium_user(report_key):
     return False
 
 def generate_report_key(license_type, custom_uses=None, custom_months=None):
-    random_str = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
-    new_key = f"{license_type.upper()}_{random_str}"
+    while True:
+        random_str = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+        new_key = f"{license_type.upper()}_{random_str}"
+        if new_key not in st.session_state.usage_db:
+            break
     if license_type == "custom":
         max_uses = custom_uses
         max_months = custom_months
@@ -283,15 +291,9 @@ def add_security_css(disable=False):
                 e.preventDefault();
                 return false;
             }
-            if (e.key === 'F12' || e.key === 'PrintScreen') {
+            if (e.key === 'F12') {
                 e.preventDefault();
-                alert('截图功能已被禁用，请遵守保密协议。');
                 return false;
-            }
-        });
-        document.addEventListener('keyup', function(e) {
-            if (e.key === 'PrintScreen') {
-                alert('截图行为已被记录，请勿传播保密内容。');
             }
         });
     </script>
@@ -310,22 +312,11 @@ def add_dynamic_watermark(lang, hide):
     </div>
     """, unsafe_allow_html=True)
 
-# ================== Word 表格生成（自动列宽，浅灰边框） ==================
-def set_cell_border(cell, border_color=RGBColor(0xCC, 0xCC, 0xCC)):
-    tc = cell._tc
-    tcPr = tc.get_or_add_tcPr()
-    for edge in ['top', 'left', 'bottom', 'right']:
-        tag = f'w:{edge}'
-        border = OxmlElement(tag)
-        border.set(qn('w:val'), 'single')
-        border.set(qn('w:sz'), '4')
-        border.set(qn('w:space'), '0')
-        border.set(qn('w:color'), f'{border_color}')
-        tcPr.append(border)
-
-def markdown_to_docx(md_text, doc):
+# ================== Word 表格生成 ==================
+def markdown_to_docx(md_text, doc, lang):
     lines = md_text.split('\n')
     i = 0
+    font_name = 'Arial' if lang == 'en' else '宋体'
     while i < len(lines):
         line = lines[i]
         if line.startswith('# '):
@@ -364,16 +355,13 @@ def markdown_to_docx(md_text, doc):
                     table.style = 'Table Grid'
                     table.autofit = True
                     table.width = Inches(6.5)
-                    for row in table.rows:
-                        for cell in row.cells:
-                            set_cell_border(cell, RGBColor(0xCC, 0xCC, 0xCC))
                     for col_idx, cell_text in enumerate(headers):
                         cell = table.cell(0, col_idx)
                         cell.text = cell_text
                         for paragraph in cell.paragraphs:
                             for run in paragraph.runs:
                                 run.font.bold = True
-                                run.font.name = 'Arial' if lang == 'en' else '宋体'
+                                run.font.name = font_name
                     for row_idx, data_line in enumerate(data_lines):
                         cells = parse_row(data_line)
                         for col_idx, cell_text in enumerate(cells):
@@ -382,13 +370,13 @@ def markdown_to_docx(md_text, doc):
                                 cell.text = cell_text
                                 for paragraph in cell.paragraphs:
                                     for run in paragraph.runs:
-                                        run.font.name = 'Arial' if lang == 'en' else '宋体'
+                                        run.font.name = font_name
                     doc.add_paragraph()
             continue
         if line.strip():
             p = doc.add_paragraph(line)
             for run in p.runs:
-                run.font.name = 'Arial' if lang == 'en' else '宋体'
+                run.font.name = font_name
         else:
             doc.add_paragraph()
         i += 1
@@ -419,7 +407,6 @@ def admin_settings_dialog():
         st.success("当前会话已使用新配置（刷新页面后恢复为永久配置）")
         st.rerun()
     st.markdown("---")
-    
     st.subheader("Report Key 生成器")
     key_type = st.selectbox("选择授权类型", ["试用版", "一级用户", "二级用户", "三级用户", "四级用户", "自定义"])
     custom_uses = None
@@ -447,10 +434,8 @@ def admin_settings_dialog():
         st.success(f"已生成 {type_name} Report Key：")
         st.code(new_key, language="text")
         st.write(f"可使用次数：{max_uses} 次，有效期至：{expiry_str[:10]}")
-    
     st.markdown("---")
     st.subheader("生成付费套餐授权码")
-
     col_price1, col_price2, col_price3 = st.columns(3)
     with col_price1:
         st.markdown("**单次通行**")
@@ -461,7 +446,6 @@ def admin_settings_dialog():
             st.success(f"单次通行授权码：")
             st.code(new_key, language="text")
             st.write(f"次数：{max_uses}，有效期：无限制（至 {expiry_str[:10]}）")
-    
     with col_price2:
         st.markdown("**100次套餐**")
         st.markdown("180元 / 30美元")
@@ -471,7 +455,6 @@ def admin_settings_dialog():
             st.success(f"100次套餐授权码：")
             st.code(new_key, language="text")
             st.write(f"次数：{max_uses}，有效期：1个月（至 {expiry_str[:10]}）")
-    
     with col_price3:
         st.markdown("**1200次套餐**")
         st.markdown("1200元 / 200美元")
@@ -481,13 +464,11 @@ def admin_settings_dialog():
             st.success(f"1200次套餐授权码：")
             st.code(new_key, language="text")
             st.write(f"次数：{max_uses}，有效期：12个月（至 {expiry_str[:10]}）")
-    
     st.markdown("---")
     st.subheader("已生成的所有 Report Key")
     for key, data in st.session_state.usage_db.items():
         expiry = datetime.fromisoformat(data["expiry"]).strftime("%Y-%m-%d")
         st.write(f"- {key}: {data['remaining']} 次剩余, 有效期至 {expiry}")
-    
     st.markdown("---")
     st.subheader("永久修改 API Key")
     st.markdown("请前往 [Streamlit Cloud Secrets](https://share.streamlit.io/) 修改 `AI_API_KEY`、`AI_BASE_URL` 和 `AI_MODEL_NAME`，然后重启应用。")
@@ -509,7 +490,7 @@ with col4:
         else:
             admin_login_dialog()
 
-# ================== 语言文本（包含旧版简洁 prompt） ==================
+# ================== 语言文本（包含高质量 prompt） ==================
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -571,13 +552,20 @@ TEXTS = {
         "key_error": "授权码无效或已过期",
         "back_btn": "← 返回重新填写",
         "footer": "© 2026 Laurence Ku | AI产品可行性分析系统 | 基于25年研发管理经验",
-        "trial_ended": "试用已结束，请联系 nc.ku@hotmail.com",
-        "no_license": "未输入授权码，当前为试用模式（有水印、不可复制、不可下载）",
-        # ================== 旧版简洁 prompt（中文） ==================
+        "trial_ended": "试用次数已用完，请联系 nc.ku@hotmail.com 购买授权码",
+        "no_license": "未输入授权码，当前为试用模式（剩余次数：{}）",
+        "trial_warning": "⚠️ 您还有 {} 次试用机会，输入授权码可解锁无限使用和下载功能。",
+        # ================== 高质量 prompt（能生成类似附件报告的详细内容） ==================
         "report_prompt": """
 你是一位资深产品分析师和研发顾问，拥有25年消费电子及智能硬件行业经验。请根据以下产品信息，生成一份专业的《产品可行性分析报告》。
 
-报告必须严格按照以下Markdown结构输出，内容要具体、有洞察，数据基于行业常识合理推断。
+报告必须严格按照以下Markdown结构输出，并且**必须包含具体的数据、金额、百分比、评分和表格**，使报告具有实际参考价值。例如：
+- 在市场规模部分，给出具体年份的市场规模（如“2025年约320亿美元”）和增长率（如“年增长30%”）。
+- 在用户痛点部分，给出提及频率（高/中/低）和具体描述。
+- 在竞品分析部分，列出至少3个主要竞品，并给出他们的定价区间（如“$60-150”）。
+- 在销售预测部分，给出第一、二、三年的具体销售额范围（如“1.5M - 3.0M 美元”）。
+- 在投资回报部分，给出具体的研发投入、生产成本、毛利率等数字。
+- 所有表格都要填满真实、合理的行业数据。
 
 # 《产品可行性分析报告》
 ## {product_name}
@@ -590,8 +578,8 @@ TEXTS = {
 | 产品描述 | {product_description} |
 | 目标市场 | {target_markets} |
 | 目标用户 | {target_users} |
-| 报告日期 | 自动生成 |
-| 分析人 | AI 分析师（基于行业数据库） |
+| 报告日期 | {{CURRENT_DATE}} |
+| 分析人 | {{ANALYST_INFO}} |
 
 ---
 
@@ -599,19 +587,19 @@ TEXTS = {
 
 ### 1.1 市场规模与趋势
 
-（请根据目标市场分别列出主要市场的规模、增长率、驱动因素和瓶颈，用表格形式）
+（请根据目标市场分别列出主要市场的规模、增长率、驱动因素和瓶颈，用表格形式，每个市场一行，包含：市场规模（具体年份和金额）、年增长率、主要驱动因素、主要瓶颈）
 
 ### 1.2 用户画像
 
-（用表格描述核心用户特征）
+（用表格描述核心用户特征：年龄、性别、收入、宠物类型、购买动机、价格敏感度、信息获取渠道等）
 
 ### 1.3 用户痛点分析
 
-（列出3-5个核心痛点，用表格说明提及频率和描述）
+（列出3-5个核心痛点，用表格说明：痛点、提及频率（高/中/低）、具体描述）
 
 ### 1.4 关键功能需求排序
 
-（用表格列出功能、重要性评分和说明）
+（用表格列出功能、重要性评分（1-10分）、说明）
 
 ---
 
@@ -619,15 +607,15 @@ TEXTS = {
 
 ### 2.1 主要竞争对手
 
-（根据产品品类，列出至少3个主要竞品，用表格说明品牌、产品、优势、劣势、定价区间）
+（根据产品品类，列出至少3个主要竞品，用表格说明：品牌、产品型号/系列、优势、劣势、定价区间）
 
 ### 2.2 竞品功能对比
 
-（选择5-6个关键功能进行对比，用表格展示）
+（选择5-6个关键功能进行对比，用表格展示：功能、竞品A表现、竞品B表现、竞品C表现、市场空白机会）
 
 ### 2.3 市场空白点分析
 
-（列出至少3个市场空白机会）
+（列出至少3个市场空白机会，用要点形式，每个机会给出简要说明）
 
 ---
 
@@ -635,15 +623,15 @@ TEXTS = {
 
 ### 3.1 目标市场渠道结构
 
-（用表格描述主要渠道类型、占比、特点、适合度）
+（用表格描述主要渠道类型、占比、特点、适合度，分中国和美国市场）
 
 ### 3.2 客户现有渠道现状
 
-（基于用户输入：渠道情况={channel_status}，渠道详情={channel_detail}，品牌认知度={brand_status}，进行分析）
+（基于用户输入：渠道情况={channel_status}，渠道详情={channel_detail}，品牌认知度={brand_status}，进行分析，说明优势和不足）
 
 ### 3.3 渠道策略建议
 
-（按年份给出渠道拓展建议，用表格）
+（按年份给出渠道拓展建议，用表格：阶段、市场、渠道策略、具体行动）
 
 ---
 
@@ -651,15 +639,15 @@ TEXTS = {
 
 ### 4.1 关键技术要求
 
-（用表格列出关键技术项、要求、客户现有能力、风险评估）
+（用表格列出：关键技术项、要求、客户现有能力、风险评估（高/中/低））
 
 ### 4.2 开发周期估算
 
-（用表格列出阶段、时间、关键任务）
+（用表格列出：阶段、时间、关键任务）
 
 ### 4.3 关键风险点
 
-（用表格列出风险、可能性、影响、应对措施）
+（用表格列出：风险、可能性（高/中/低）、影响（高/中/低）、应对措施）
 
 ---
 
@@ -667,15 +655,15 @@ TEXTS = {
 
 ### 5.1 预测模型假设
 
-（列出定价、目标市场、份额等假设）
+（列出定价、目标市场、市场份额等假设，用要点形式）
 
 ### 5.2 销售额预测
 
-（3年预测，用表格）
+（3年预测，用表格：年份、美国市场、中国市场、总营收、关键假设）
 
 ### 5.3 投资回报估算
 
-（用表格列出研发投入、市场推广、首批生产成本、总启动资金、毛利率、盈亏平衡点）
+（用表格列出：研发投入、市场推广、首批生产成本、总启动资金、毛利率、盈亏平衡点）
 
 ---
 
@@ -683,19 +671,19 @@ TEXTS = {
 
 ### 6.1 综合评估
 
-（用表格打分：市场吸引力、技术可行性、渠道匹配度、竞争格局、投资回报，各1-10分，并说明）
+（用表格打分：市场吸引力、技术可行性、渠道匹配度、竞争格局、投资回报，各1-10分，并说明理由）
 
 ### 6.2 差异化定位建议
 
-（给出2-3个定位选项，用表格分析优势和风险）
+（给出2-3个定位选项，用表格分析：定位、优势、风险）
 
 ### 6.3 最终建议
 
-（给出综合评分和建议的下一步行动，5点以内）
+（给出综合评分（例如X/10分）和“建议/不建议/积极进入”的结论，以及5点具体的下一步行动）
 
 ---
 
-请直接输出报告内容，不要添加额外解释。对于用户未提供的信息，基于行业标准进行合理推断，并注明“基于行业分析”。
+请直接输出报告内容，不要添加额外解释。对于用户未提供的信息，基于行业标准进行合理推断，并给出具体的数字。
 """
     },
     "en": {
@@ -758,13 +746,19 @@ TEXTS = {
         "key_error": "Invalid or expired Report Key",
         "back_btn": "← Back to re-enter",
         "footer": "© 2026 Laurence Ku | AI Product Feasibility System | Based on 25+ years R&D experience",
-        "trial_ended": "Trial finished, please contact nc.ku@hotmail.com",
-        "no_license": "No Report Key entered. Trial mode (watermark, no copy, no download).",
-        # ================== 旧版简洁 prompt（英文） ==================
+        "trial_ended": "Trial credits used up, please contact nc.ku@hotmail.com to purchase a license",
+        "no_license": "No Report Key entered. Trial mode (remaining credits: {})",
+        "trial_warning": "⚠️ You have {} trial credits left. Enter a license key to unlock unlimited usage and download.",
         "report_prompt": """
 You are a senior product analyst and R&D consultant with 25 years of experience in consumer electronics and smart hardware. Based on the following product information, generate a professional "Product Feasibility Analysis Report".
 
-The report must strictly follow the Markdown structure below. The content should be specific, insightful, and based on industry common sense.
+The report must strictly follow the Markdown structure below and **must include specific data, amounts, percentages, scores, and tables** to provide practical value. For example:
+- In market size, provide specific year and amount (e.g., "$32B in 2025") and growth rate (e.g., "30% YoY").
+- In pain points, provide frequency (High/Medium/Low) and description.
+- In competitor analysis, list at least 3 main competitors with price ranges (e.g., "$60-150").
+- In sales forecast, provide specific revenue ranges for year 1,2,3 (e.g., "$1.5M - $3.0M").
+- In ROI, provide specific R&D cost, production cost, gross margin numbers.
+- Fill all tables with realistic, industry-based data.
 
 # Product Feasibility Analysis Report
 ## {product_name}
@@ -777,8 +771,8 @@ The report must strictly follow the Markdown structure below. The content should
 | Product Description | {product_description} |
 | Target Markets | {target_markets} |
 | Target Users | {target_users} |
-| Report Date | Auto-generated |
-| Analyst | AI Analyst (based on industry database) |
+| Report Date | {{CURRENT_DATE}} |
+| Analyst | {{ANALYST_INFO}} |
 
 ---
 
@@ -786,19 +780,19 @@ The report must strictly follow the Markdown structure below. The content should
 
 ### 1.1 Market Size & Trends
 
-(For each target market, list market size, growth rate, key drivers and barriers in a table)
+(For each target market, list market size (with year and amount), growth rate, key drivers, and barriers in a table)
 
 ### 1.2 User Persona
 
-(Describe core user characteristics in a table)
+(Describe core user characteristics in a table: age, gender, income, pet type, purchase motivation, price sensitivity, info channels)
 
 ### 1.3 User Pain Points
 
-(List 3-5 core pain points in a table with frequency and description)
+(List 3-5 core pain points in a table: pain point, frequency (High/Medium/Low), description)
 
 ### 1.4 Key Feature Priority
 
-(List features, importance score, and explanation in a table)
+(List features, importance score (1-10), explanation in a table)
 
 ---
 
@@ -806,15 +800,15 @@ The report must strictly follow the Markdown structure below. The content should
 
 ### 2.1 Main Competitors
 
-(List at least 3 main competitors with brand, product, strengths, weaknesses, price range in a table)
+(List at least 3 main competitors in a table: brand, product/model, strengths, weaknesses, price range)
 
 ### 2.2 Feature Comparison
 
-(Compare 5-6 key features in a table)
+(Compare 5-6 key features in a table: feature, competitor A, competitor B, competitor C, gap opportunity)
 
 ### 2.3 Market Gap Summary
 
-(List at least 3 market gap opportunities)
+(List at least 3 market gaps with brief explanation)
 
 ---
 
@@ -822,15 +816,15 @@ The report must strictly follow the Markdown structure below. The content should
 
 ### 3.1 Target Market Channel Structure
 
-(Describe main channel types, share, characteristics, suitability in a table)
+(Describe channel types, share, characteristics, suitability in a table, split by China and US)
 
 ### 3.2 Client's Current Channel Status
 
-(Based on user input: channel status={channel_status}, channel details={channel_detail}, brand awareness={brand_status})
+(Analyze based on user input: channel status={channel_status}, channel details={channel_detail}, brand awareness={brand_status})
 
 ### 3.3 Channel Strategy Recommendations
 
-(Provide channel expansion recommendations by year in a table)
+(Provide channel expansion recommendations by year in a table: phase, market, channel strategy, specific actions)
 
 ---
 
@@ -838,7 +832,7 @@ The report must strictly follow the Markdown structure below. The content should
 
 ### 4.1 Key Technical Requirements
 
-(List technology, requirement, client capability, risk level in a table)
+(List technology, requirement, client capability, risk level (High/Medium/Low) in a table)
 
 ### 4.2 Development Timeline Estimate
 
@@ -846,7 +840,7 @@ The report must strictly follow the Markdown structure below. The content should
 
 ### 4.3 Key Risk Points
 
-(List risk, probability, impact, mitigation in a table)
+(List risk, probability (High/Medium/Low), impact (High/Medium/Low), mitigation in a table)
 
 ---
 
@@ -854,11 +848,11 @@ The report must strictly follow the Markdown structure below. The content should
 
 ### 5.1 Forecast Assumptions
 
-(List pricing, target market, share assumptions)
+(List pricing, target market, share assumptions in bullet points)
 
 ### 5.2 Sales Forecast
 
-(3-year forecast in a table)
+(3-year forecast in a table: year, US market, China market, total revenue, key assumptions)
 
 ### 5.3 ROI Estimate
 
@@ -874,15 +868,15 @@ The report must strictly follow the Markdown structure below. The content should
 
 ### 6.2 Differentiation Positioning Recommendations
 
-(Provide 2-3 positioning options with advantages and risks in a table)
+(Provide 2-3 positioning options in a table: positioning, advantages, risks)
 
 ### 6.3 Final Recommendation
 
-(Provide overall score and 5 specific next steps)
+(Provide overall score (e.g., X/10) and a conclusion like "Recommended / Highly Recommended / Not Recommended", plus 5 specific next steps)
 
 ---
 
-Output the report directly without additional explanation. For information not provided by the user, make reasonable inferences based on industry standards and note "based on industry analysis".
+Output the report directly without additional explanation. For information not provided by the user, make reasonable inferences based on industry standards and provide specific numbers.
 """
     }
 }
@@ -890,6 +884,8 @@ Output the report directly without additional explanation. For information not p
 # ================== 获取当前语言 ==================
 lang = st.session_state.lang
 t = TEXTS[lang]
+t["no_license"] = t["no_license"].format(st.session_state.trial_uses_left)
+t["trial_warning"] = t["trial_warning"].format(st.session_state.trial_uses_left)
 
 st.title(t["title"])
 
@@ -899,7 +895,6 @@ if "order_success" in params and "plan" in params:
     plan = params["plan"]
     customer_email = params.get("email", None)
     current_lang = st.session_state.lang
-    
     if current_lang == "zh":
         if plan == "single":
             uses = 1
@@ -934,12 +929,9 @@ if "order_success" in params and "plan" in params:
             uses = 0
             months = 0
             plan_name = "Unknown"
-    
     if uses > 0:
         new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
         st.session_state.current_report_key = new_key
-        
-        # 发送邮件
         if customer_email:
             success, msg = send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
             if success:
@@ -948,8 +940,6 @@ if "order_success" in params and "plan" in params:
                 st.warning(f"⚠️ 邮件发送失败，请联系客服。错误：{msg}")
         else:
             st.info("未获取到您的邮箱，授权码仅显示在下方。")
-        
-        # 显示成功消息和复制按钮
         st.success(f"✅ 支付成功！您的授权码已生成并自动填入下方输入框。")
         copy_js = f"""
         <div style="background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin-top: 10px;">
@@ -966,7 +956,7 @@ if "order_success" in params and "plan" in params:
         st.error("❌ 支付失败或套餐无效，请联系客服。")
         st.query_params.clear()
 
-# ================== 支付对话框 ==================
+# ================== 购买对话框 ==================
 @st.dialog("购买+解锁")
 def purchase_dialog():
     st.markdown("### 选择套餐")
@@ -995,8 +985,7 @@ with st.sidebar:
         t["report_key_label"],
         value=st.session_state.current_report_key,
         type="password",
-        key="report_key_widget",
-        on_change=lambda: setattr(st.session_state, 'current_report_key', st.session_state.report_key_widget)
+        key="report_key_widget"
     )
     if report_key_input:
         valid, remaining, expiry_str, lic_type = activate_license(report_key_input)
@@ -1004,51 +993,35 @@ with st.sidebar:
             st.success(f"授权成功！剩余 {remaining} 次，有效期至 {expiry_str[:10]}")
             st.session_state.current_report_key = report_key_input
         else:
-            st.error("授权码无效或已过期")
-            st.session_state.current_report_key = ""
-            st.session_state.current_license_type = None
+            if report_key_input != st.session_state.current_report_key:
+                st.error("授权码无效或已过期")
+                st.session_state.current_report_key = ""
+                st.session_state.current_license_type = None
+    else:
+        if st.session_state.trial_uses_left > 0:
+            st.warning(t["trial_warning"])
+        else:
+            st.error(t["trial_ended"])
     if st.session_state.admin_logged_in:
         st.info("管理员模式：无限使用")
     else:
-        if report_key_input and is_premium_user(report_key_input):
-            remaining_str, expiry_str = get_remaining_info(report_key_input)
-            st.markdown(f"**{t['license_info']}**")
-            st.write(f"{t['remaining_label']}: {remaining_str}")
+        remaining_str, expiry_str = get_remaining_info(st.session_state.current_report_key)
+        st.markdown(f"**{t['license_info']}**")
+        st.write(f"{t['remaining_label']}: {remaining_str}")
+        if expiry_str != "试用剩余次数":
             st.write(f"{t['expiry_label']}: {expiry_str}")
-        else:
-            st.warning(t["no_license"])
     st.markdown("---")
     st.markdown(t["contact_info"])
     st.markdown("---")
-    
-    # ================== 购买引导（侧边栏） ==================
     st.markdown(f"## {t['purchase_title']}")
-    st.markdown("""
-| 套餐 | 价格 | 次数 | 有效期 |
-|------|------|------|--------|
-| 单次通行 | 18元 / 3美元 | 1次 | 无限制 |
-| 100次套餐 | 180元 / 30美元 | 100次 | 1个月 |
-| 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
-""")
-    st.markdown("#### 🌍 国际支付（Stripe）")
-    col_s1, col_s2, col_s3 = st.columns(3)
-    with col_s1:
-        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/test_9B67sL0Wh7298Nuaxk8og00")
-    with col_s2:
-        st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/9B6cN5bAVcmt5Bi7l88og02")
-    with col_s3:
-        st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/9B67sL0Wh7298Nuaxk8og00")
-    st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
-    st.info("国内支付即将开放，敬请期待。")
-    st.info("支付成功后会自动跳回本页面，授权码将自动填入并激活。")
+    if st.button("💰 购买授权码", use_container_width=True):
+        purchase_dialog()
     st.markdown("---")
-    
     st.markdown(f"## {t['sidebar_title']}")
     st.markdown(t["sidebar_basis"])
     for item in t["basis_items"]:
         st.markdown(f"- {item}")
     st.markdown("---")
-    
     analyst_name = st.text_input(t["analyst_name_label"], placeholder=t["analyst_name_ph"])
     analyst_title = st.text_input(t["analyst_title_label"], placeholder=t["analyst_title_ph"])
     if analyst_name:
@@ -1057,7 +1030,6 @@ with st.sidebar:
             st.markdown(f"_{analyst_title}_")
     else:
         st.caption(t["analyst_name_ph"])
-    
     st.markdown("---")
     st.markdown(f"**{t['api_status']}**")
     if st.session_state.ai_api_key:
@@ -1068,34 +1040,29 @@ with st.sidebar:
 # ================== 主表单 ==================
 st.markdown(f"### {t['input_title']}")
 col1, col2 = st.columns(2)
-
 with col1:
     st.markdown(f"#### {t['basic_info']}")
     product_name = st.text_input(t["product_name"], placeholder=t["product_name_ph"])
     product_description = st.text_area(t["product_desc"], placeholder=t["product_desc_ph"], height=100)
     target_markets = st.multiselect(t["target_markets"], options=t["market_options"], default=[t["market_options"][0]])
     target_users = st.text_input(t["target_users"], placeholder=t["target_users_ph"])
-
 with col2:
     st.markdown(f"#### {t['market_channel']}")
     channel_status = st.selectbox(t["channel_status"], options=t["channel_options"])
     channel_detail = st.text_area(t["channel_detail"], placeholder=t["channel_detail_ph"], height=80)
     brand_status = st.selectbox(t["brand_status"], options=t["brand_options"])
-
 st.markdown(f"#### {t['tech_capability']}")
 col3, col4 = st.columns(2)
 with col3:
     tech_experience = st.multiselect(t["tech_experience"], options=t["tech_options"], default=[])
 with col4:
     dev_stage = st.selectbox(t["dev_stage"], options=t["stage_options"])
-
 st.markdown(f"#### {t['business_goals']}")
 col5, col6 = st.columns(2)
 with col5:
     estimated_budget = st.selectbox(t["estimated_budget"], options=t["budget_options"])
 with col6:
     sales_target = st.text_input(t["sales_target"], placeholder=t["sales_target_ph"])
-
 st.markdown(f"#### {t['other_info']}")
 additional_info = st.text_area("", placeholder=t["other_ph"], height=80)
 
@@ -1104,8 +1071,6 @@ st.markdown("---")
 col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
 with col_btn2:
     submitted = st.button(t["submit_btn"], type="primary", use_container_width=True)
-
-# 创建一个空容器，用于显示加载动画和文字（位于按钮下方）
 spinner_placeholder = st.empty()
 
 # ================== 报告生成逻辑 ==================
@@ -1115,16 +1080,22 @@ if submitted:
     elif not st.session_state.ai_api_key:
         st.error(t["api_key_missing"])
     else:
-        can_generate = True
+        can_generate = False
         if st.session_state.admin_logged_in:
             can_generate = True
-        elif is_premium_user(report_key_input):
-            if not consume_usage(report_key_input):
+        elif is_premium_user(st.session_state.current_report_key):
+            if consume_usage(st.session_state.current_report_key):
+                can_generate = True
+            else:
                 st.error(t["trial_ended"])
-                can_generate = False
         else:
-            can_generate = True
+            if st.session_state.trial_uses_left > 0:
+                can_generate = True
+            else:
+                st.error(t["trial_ended"])
         if can_generate:
+            if not is_premium_user(st.session_state.current_report_key):
+                consume_usage("")
             st.session_state.pulse_active = True
             with spinner_placeholder.container():
                 st.markdown(f'<div style="text-align: center; margin-top: 10px;">{t["generating"]}</div>', unsafe_allow_html=True)
@@ -1137,8 +1108,8 @@ if submitted:
                                 analyst_info = analyst_name
                         else:
                             analyst_info = "AI 分析师（基于行业数据库）" if lang == "zh" else "AI Analyst (based on industry database)"
-                        
-                        client = openai.OpenAI(
+                        from openai import OpenAI
+                        client = OpenAI(
                             api_key=st.session_state.ai_api_key,
                             base_url=st.session_state.ai_base_url,
                         )
@@ -1159,7 +1130,6 @@ if submitted:
                             temperature=0.7,
                         )
                         report_content = response.choices[0].message.content
-                        
                         if lang == "zh":
                             current_date = datetime.now().strftime("%Y年%m月%d日")
                             report_content = re.sub(r'\d{4}年\d{1,2}月\d{1,2}日', current_date, report_content)
@@ -1168,7 +1138,6 @@ if submitted:
                             current_date = datetime.now().strftime("%B %d, %Y")
                             report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
                             report_content = re.sub(r'[A-Z][a-z]+ \d{1,2}, \d{4}', current_date, report_content)
-                        
                         report_content = report_content.replace("{{CURRENT_DATE}}", current_date)
                         report_content = report_content.replace("{{ANALYST_INFO}}", analyst_info)
                         if lang == "zh":
@@ -1176,12 +1145,10 @@ if submitted:
                         else:
                             report_content = re.sub(r'(\| Analyst \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
                         report_content = re.sub(r'\*+', '', report_content)
-                        
                         if lang == "zh":
                             st.session_state.report_content_zh = report_content
                         else:
                             st.session_state.report_content_en = report_content
-                        
                         st.session_state.pulse_active = False
                         st.rerun()
                     except Exception as e:
@@ -1196,18 +1163,17 @@ else:
     current_report = st.session_state.report_content_en
 
 if current_report:
-    premium = is_premium_user(report_key_input)
+    premium = is_premium_user(st.session_state.current_report_key)
     add_security_css(disable=premium)
     show_watermark = not premium
     add_dynamic_watermark(lang, hide=not show_watermark)
     st.markdown(f"## {t['report_title']}")
     st.markdown(current_report, unsafe_allow_html=True)
-    
     st.markdown("---")
     st.markdown(f"### {t['download_section']}")
     if premium:
         doc = Document()
-        markdown_to_docx(current_report, doc)
+        markdown_to_docx(current_report, doc, lang)
         doc_bytes = BytesIO()
         doc.save(doc_bytes)
         doc_bytes.seek(0)
@@ -1220,7 +1186,6 @@ if current_report:
     else:
         if st.button(t["download_unlock_btn"], use_container_width=True):
             purchase_dialog()
-    
     if st.button(t["back_btn"]):
         if lang == "zh":
             st.session_state.report_content_zh = None
