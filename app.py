@@ -987,15 +987,16 @@ if "order_success" in params and "plan" in params:
         # 尝试发送邮件
         # 尝试发送邮件（验证收件人有效性）
 # 尝试发送邮件（验证收件人有效性）
+# 尝试发送邮件（验证收件人有效性）
 email_sent = False
 email_error = None
-# 验证邮箱是否有效（包含 @ 和 . 的基本验证，且不是 Stripe 占位符）
-if customer_email and '@' in customer_email and '.' in customer_email and customer_email != 'ICHECKOUT_EMAIL':
-    success, msg = send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
+# 直接从 params 获取邮箱（避免变量作用域问题）
+customer_email_from_params = params.get("email", None)
+if customer_email_from_params and '@' in customer_email_from_params and '.' in customer_email_from_params and customer_email_from_params != 'ICHECKOUT_EMAIL':
+    success, msg = send_license_email(customer_email_from_params, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
     email_sent = success
     email_error = msg if not success else None
 else:
-    # 邮箱无效或不提供，跳过邮件发送
     email_sent = None
     email_error = None
 
