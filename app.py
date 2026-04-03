@@ -238,9 +238,9 @@ def add_dynamic_watermark(lang, hide):
     if hide:
         return
     if lang == "zh":
-        watermark_text = "机密，样板报告，请联系 Techlife2027@gmail.com"
+        watermark_text = "机密，样板报告，请联系 nc.ku@hotmail.com"
     else:
-        watermark_text = "Confidential, Sample Report, Pls contact Techlife2027@gmail.com"
+        watermark_text = "Confidential, Sample Report, Pls contact nc.ku@hotmail.com"
     st.markdown(f"""
     <div style="position: fixed; bottom: 20px; right: 20px; opacity: 0.4; font-size: 14px; color: #666; pointer-events: none; z-index: 1000; font-family: sans-serif; background: rgba(255,255,255,0.5); padding: 4px 8px; border-radius: 4px;">
         {watermark_text}
@@ -459,7 +459,7 @@ TEXTS = {
         "license_info": "授权信息",
         "remaining_label": "剩余次数",
         "expiry_label": "有效期至",
-        "contact_info": "📞 **联系：**  \n✉️ 电邮: Techlife2027@gmail.com  \n📱 电话/微信: +86-13823760640",
+        "contact_info": "📞 **联系人：古生**  \n✉️ 电邮: nc.ku@hotmail.com  \n📱 电话/微信: +86-13823760640",
         "purchase_title": "💰 购买+解锁",
         "input_title": "📝 产品信息输入",
         "basic_info": "基本信息",
@@ -502,7 +502,7 @@ TEXTS = {
         "key_error": "授权码无效或已过期",
         "back_btn": "← 返回重新填写",
         "footer": "© 2026 Laurence Ku | AI产品可行性分析系统 | 基于25年研发管理经验",
-        "trial_ended": "试用次数已用完，请联系 Techlife2027@gmail.com 购买授权码",
+        "trial_ended": "试用次数已用完，请联系 nc.ku@hotmail.com 购买授权码",
         "no_license": "未输入授权码，当前为试用模式（剩余次数：{}）",
         "trial_warning": "⚠️ 您还有 {} 次试用机会，输入授权码可解锁无限使用和下载功能。",
         "report_prompt": """
@@ -654,7 +654,7 @@ TEXTS = {
         "license_info": "License Info",
         "remaining_label": "Remaining uses",
         "expiry_label": "Valid until",
-        "contact_info": "📞 **Contact: Laurence**  \n✉️ Email: Techlife2027@gmail.com  \n📱 Phone/Wechat: +86-13823760640",
+        "contact_info": "📞 **Contact: Laurence Ku**  \n✉️ Email: nc.ku@hotmail.com  \n📱 Phone/Wechat: +86-13823760640",
         "purchase_title": "💰 Purchase + Unlock",
         "input_title": "📝 Product Information Input",
         "basic_info": "Basic Information",
@@ -697,7 +697,7 @@ TEXTS = {
         "key_error": "Invalid or expired Report Key",
         "back_btn": "← Back to re-enter",
         "footer": "© 2026 Laurence Ku | AI Product Feasibility System | Based on 25+ years R&D experience",
-        "trial_ended": "Trial credits used up, please contact Techlife2027@gmail.com to purchase a license",
+        "trial_ended": "Trial credits used up, please contact nc.ku@hotmail.com to purchase a license",
         "no_license": "No Report Key entered. Trial mode (remaining credits: {})",
         "trial_warning": "⚠️ You have {} trial credits left. Enter a license key to unlock unlimited usage and download.",
         "report_prompt": """
@@ -917,7 +917,7 @@ if "order_success" in params and "plan" in params:
         st.error("❌ 支付失败或套餐无效，请联系客服。")
         st.query_params.clear()
 
-# ================== 购买对话框 ==================
+# ================== 购买对话框（自动跳转） ==================
 @st.dialog("购买+解锁")
 def purchase_dialog():
     st.markdown("### 选择套餐")
@@ -941,27 +941,27 @@ def purchase_dialog():
         if st.button("🎟️ Single Pass\n$3", use_container_width=True):
             try:
                 checkout_session = stripe.checkout.Session.create(
-                    payment_method_types=["card", "alipay", "wechat_pay"],  # 支持信用卡、支付宝、微信支付
+                    payment_method_types=["card", "alipay", "wechat_pay"],
                     line_items=[{
                         "price_data": {
-                            "currency": "cny",  # 使用人民币，Stripe 自动转换美元
+                            "currency": "cny",
                             "product_data": {"name": "单次通行 (3次使用)"},
-                            "unit_amount": 2100,  # 21.00 元 (约 3 美元)
+                            "unit_amount": 2100,
                         },
                         "quantity": 1,
                     }],
                     mode="payment",
                     payment_method_options={
                         "wechat_pay": {
-                            "client": "web"  # 必须指定为网页端
+                            "client": "web"
                         }
                     },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=single",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                st.success("✅ 支付链接已生成，请点击下方按钮完成支付")
-                st.link_button("前往 Stripe 支付页面", checkout_session.url)
+                # 自动跳转
+                st.markdown(f'<script>window.location.href = "{checkout_session.url}";</script>', unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}")
     
@@ -975,7 +975,7 @@ def purchase_dialog():
                         "price_data": {
                             "currency": "cny",
                             "product_data": {"name": "100次套餐"},
-                            "unit_amount": 21000,  # 210.00 元
+                            "unit_amount": 21000,
                         },
                         "quantity": 1,
                     }],
@@ -989,8 +989,7 @@ def purchase_dialog():
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                st.success("✅ 支付链接已生成，请点击下方按钮完成支付")
-                st.link_button("前往 Stripe 支付页面", checkout_session.url)
+                st.markdown(f'<script>window.location.href = "{checkout_session.url}";</script>', unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}")
     
@@ -1004,7 +1003,7 @@ def purchase_dialog():
                         "price_data": {
                             "currency": "cny",
                             "product_data": {"name": "1200次套餐"},
-                            "unit_amount": 140000,  # 1400.00 元
+                            "unit_amount": 140000,
                         },
                         "quantity": 1,
                     }],
@@ -1018,8 +1017,7 @@ def purchase_dialog():
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                st.success("✅ 支付链接已生成，请点击下方按钮完成支付")
-                st.link_button("前往 Stripe 支付页面", checkout_session.url)
+                st.markdown(f'<script>window.location.href = "{checkout_session.url}";</script>', unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}")
     
