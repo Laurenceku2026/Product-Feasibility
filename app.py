@@ -912,6 +912,13 @@ if st.session_state.get("show_payment_dialog", False):
         st.code(st.session_state.payment_new_key, language="text")
         st.caption("请妥善保管此授权码，下次使用时可手动复制并粘贴到左侧输入框。")
         
+        # 检测当前页面是否有报告内容
+        has_report = st.session_state.report_content_zh is not None or st.session_state.report_content_en is not None
+        if not has_report:
+            st.warning("⚠️ 检测到您可能在新窗口中完成支付。请关闭当前窗口，回到您原先生成报告的那个窗口，报告水印将自动去除，您可以下载Word文档。")
+        else:
+            st.success("✅ 授权码已自动激活，报告水印已去除，您现在可以下载Word文档。")
+        
         if st.session_state.get("payment_email_sent") is True:
             st.success("✅ 授权码已同时发送至您的邮箱。")
         elif st.session_state.get("payment_email_sent") is False:
@@ -921,7 +928,6 @@ if st.session_state.get("show_payment_dialog", False):
         
         st.markdown("---")
         if st.button("确定", use_container_width=True):
-            # 清除弹窗标志和临时数据
             st.session_state.show_payment_dialog = False
             for key in ["payment_new_key", "payment_plan_name", "payment_email_sent", "payment_email_error"]:
                 if key in st.session_state:
@@ -1011,16 +1017,17 @@ def purchase_dialog():
 """)
     st.markdown("#### 🌍 国际支付（Stripe）")
     col1, col2, col3 = st.columns(3)
+    # 强制在当前标签页打开（target="_self"）
     with col1:
-        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/test_9B67sL0Wh7298Nuaxk8og00")
+        st.markdown('<a href="https://buy.stripe.com/test_9B67sL0Wh7298Nuaxk8og00" target="_self" style="background-color: #FF4B4B; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; width: 100%; text-align: center;">🎟️ Single Pass<br>$3</a>', unsafe_allow_html=True)
     with col2:
-        st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/9B6cN5bAVcmt5Bi7l88og02")
+        st.markdown('<a href="https://buy.stripe.com/9B6cN5bAVcmt5Bi7l88og02" target="_self" style="background-color: #FF4B4B; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; width: 100%; text-align: center;">📦 100 Credits<br>$30</a>', unsafe_allow_html=True)
     with col3:
-        st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/9B67sL0Wh7298Nuaxk8og00")
+        st.markdown('<a href="https://buy.stripe.com/9B67sL0Wh7298Nuaxk8og00" target="_self" style="background-color: #FF4B4B; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; width: 100%; text-align: center;">🚀 1200 Credits<br>$200</a>', unsafe_allow_html=True)
     st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
     st.info("国内支付即将开放，敬请期待。")
     st.markdown("支付成功后会自动跳回本页面，授权码将自动填入并激活。")
-
+    st.info("⚠️ 请确保支付页面在当前标签页打开，不要在新窗口/标签页中支付，否则授权码将无法自动回到报告页面。")
 # ================== 侧边栏 ==================
 with st.sidebar:
     report_key_input = st.text_input(
