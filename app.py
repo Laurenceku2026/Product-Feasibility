@@ -498,10 +498,16 @@ TEXTS = {
         "trial_ended": "试用次数已用完，请联系 nc.ku@hotmail.com 购买授权码",
         "no_license": "未输入授权码，当前为试用模式（剩余次数：{}）",
         "trial_warning": "⚠️ 您还有 {} 次试用机会，输入授权码可解锁无限使用和下载功能。",
-        "report_prompt": """
+"report_prompt": """
 你是一位资深产品分析师和研发顾问，拥有25年消费电子及智能硬件行业经验。请根据以下产品信息，生成一份专业的《产品可行性分析报告》。
 
-**重要：报告必须严格按照以下Markdown结构输出，并且必须包含第六部分的所有三个小节：6.1、6.2、6.3。不得省略任何小节。** 报告内容要具体、有洞察，数据基于行业常识合理推断，并给出具体数字（市场规模、增长率、定价、销售额等）。
+**重要要求：**
+1. 报告必须严格按照以下Markdown结构输出，并且必须包含第六部分的所有三个小节：6.1、6.2、6.3。
+2. 对于用户选择的每一个目标市场（例如中国大陆、美国等），都需要分别进行市场规模与趋势、用户画像、竞品分析、渠道结构的分析。**不能只笼统地写一个综合表格，而是按市场分别列出**。
+3. 用户痛点分析必须基于真实场景，并**从痛点中提炼出具体的技术参数要求**（例如：从“清洗困难”提炼出“易拆洗、无死角、可洗碗机清洗”等具体设计指标）。
+4. 竞品分析要针对每个目标市场列出该市场的主要竞品（至少3个），并对比功能、定价、优势劣势。
+5. 技术可行性评估中的“关键技术要求”必须与前面提炼的用户痛点直接关联，明确写出对应的技术指标（如噪音≤30dB、出粮精度误差<5%、材质为食品级不锈钢等）。
+6. 所有表格必须包含具体数据（金额、百分比、评分等），不得留空或仅写“待补充”。
 
 # 《产品可行性分析报告》
 ## {product_name}
@@ -525,19 +531,19 @@ TEXTS = {
 
 ### 1.1 市场规模与趋势
 
-（请根据目标市场分别列出主要市场的规模、增长率、驱动因素和瓶颈，用表格形式，每个市场一行，包含：市场规模（具体年份和金额）、年增长率、主要驱动因素、主要瓶颈）
+**请按每个目标市场分别列出**，每个市场单独一个表格或一个子章节。表格需包含：市场规模（具体年份和金额）、年增长率、主要驱动因素、主要瓶颈。
 
 ### 1.2 用户画像
 
-（用表格描述核心用户特征：年龄、性别、收入、宠物类型、购买动机、价格敏感度、信息获取渠道等）
+**请按每个目标市场分别描述**核心用户特征：年龄、性别、收入、宠物类型、购买动机、价格敏感度、信息获取渠道等。可用表格或分点列出。
 
 ### 1.3 用户痛点分析
 
-（列出3-5个核心痛点，用表格说明：痛点、提及频率（高/中/低）、具体描述）
+**请按每个目标市场分别列出3-5个核心痛点**，用表格说明：痛点、提及频率（高/中/低）、具体描述。**并且在每个痛点后，直接提炼出对应的技术参数要求**（例如：痛点“饮水机清洗困难”→ 技术参数要求：“结构可完全拆卸、无清洁死角、支持洗碗机清洗”）。
 
 ### 1.4 关键功能需求排序
 
-（用表格列出功能、重要性评分（1-10分）、说明）
+基于上述痛点，列出跨市场通用的关键功能需求，用表格给出功能、重要性评分（1-10分）、说明。
 
 ---
 
@@ -545,15 +551,15 @@ TEXTS = {
 
 ### 2.1 主要竞争对手
 
-（根据产品品类，列出至少3个主要竞品，用表格说明：品牌、产品型号/系列、优势、劣势、定价区间）
+**请按每个目标市场分别列出至少3个主要竞品**，用表格说明：品牌、产品型号/系列、优势、劣势、定价区间。
 
 ### 2.2 竞品功能对比
 
-（选择5-6个关键功能进行对比，用表格展示：功能、竞品A表现、竞品B表现、竞品C表现、市场空白机会）
+**请按每个目标市场分别选择5-6个关键功能进行对比**，用表格展示：功能、竞品A表现、竞品B表现、竞品C表现、市场空白机会。
 
 ### 2.3 市场空白点分析
 
-（列出至少3个市场空白机会，用要点形式，每个机会给出简要说明）
+综合所有市场，列出至少3个跨市场的空白机会，每个机会给出简要说明。
 
 ---
 
@@ -561,7 +567,7 @@ TEXTS = {
 
 ### 3.1 目标市场渠道结构
 
-（用表格描述主要渠道类型、占比、特点、适合度，分中国和美国市场）
+**请按每个目标市场分别描述**主要渠道类型、占比、特点、适合度，用表格形式。
 
 ### 3.2 客户现有渠道现状
 
@@ -569,7 +575,7 @@ TEXTS = {
 
 ### 3.3 渠道策略建议
 
-（按年份给出渠道拓展建议，用表格：阶段、市场、渠道策略、具体行动）
+按年份给出渠道拓展建议，用表格：阶段、市场、渠道策略、具体行动。
 
 ---
 
@@ -577,15 +583,15 @@ TEXTS = {
 
 ### 4.1 关键技术要求
 
-（用表格列出：关键技术项、要求、客户现有能力、风险评估（高/中/低））
+**必须与第一部分提炼的用户痛点直接挂钩**，用表格列出：关键技术项、对应的痛点、具体技术要求（含量化指标）、客户现有能力、风险评估（高/中/低）。例如：痛点“清洗困难” → 技术项“模块化快拆结构” → 要求“拆解步骤≤3步，可进洗碗机”。
 
 ### 4.2 开发周期估算
 
-（用表格列出：阶段、时间、关键任务）
+用表格列出：阶段、时间、关键任务。
 
 ### 4.3 关键风险点
 
-（用表格列出：风险、可能性（高/中/低）、影响（高/中/低）、应对措施）
+用表格列出：风险、可能性（高/中/低）、影响（高/中/低）、应对措施。
 
 ---
 
@@ -593,15 +599,15 @@ TEXTS = {
 
 ### 5.1 预测模型假设
 
-（列出定价、目标市场、市场份额等假设，用要点形式）
+列出定价、目标市场、市场份额等假设，用要点形式。
 
 ### 5.2 销售额预测
 
-（3年预测，用表格：年份、美国市场、中国市场、总营收、关键假设）
+3年预测，用表格：年份、美国市场、中国市场、总营收、关键假设。
 
 ### 5.3 投资回报估算
 
-（用表格列出：研发投入、市场推广、首批生产成本、总启动资金、毛利率、盈亏平衡点）
+用表格列出：研发投入、市场推广、首批生产成本、总启动资金、毛利率、盈亏平衡点。
 
 ---
 
@@ -609,15 +615,15 @@ TEXTS = {
 
 ### 6.1 综合评估
 
-（用表格打分：市场吸引力、技术可行性、渠道匹配度、竞争格局、投资回报，各1-10分，并说明理由）
+用表格打分：市场吸引力、技术可行性、渠道匹配度、竞争格局、投资回报，各1-10分，并说明理由。
 
 ### 6.2 差异化定位建议
 
-（给出2-3个定位选项，用表格分析：定位、优势、风险）
+给出2-3个定位选项，用表格分析：定位、优势、风险。
 
 ### 6.3 最终建议
 
-（给出综合评分（例如X/10分）和“建议/不建议/积极进入”的结论，以及5点具体的下一步行动）
+给出综合评分（例如X/10分）和“建议/不建议/积极进入”的结论，以及5点具体的下一步行动。
 
 ---
 
@@ -690,7 +696,13 @@ TEXTS = {
         "report_prompt": """
 You are a senior product analyst and R&D consultant with 25 years of experience in consumer electronics and smart hardware. Based on the following product information, generate a professional "Product Feasibility Analysis Report".
 
-**Important: The report must strictly follow the Markdown structure below and MUST include all three subsections of Part 6: 6.1, 6.2, and 6.3. Do not omit any subsection.** The content should be specific, insightful, and based on industry common sense with concrete numbers (market size, growth rates, pricing, sales figures, etc.).
+**Important Requirements:**
+1. The report must strictly follow the Markdown structure below and MUST include all three subsections of Part 6: 6.1, 6.2, and 6.3.
+2. For each target market selected by the user (e.g., Mainland China, USA), you must provide separate analysis for market size & trends, user persona, competitor analysis, and channel structure. **Do not write a single combined table; break down by market**.
+3. User pain points must be based on real scenarios, and **from each pain point, derive specific technical parameter requirements** (e.g., pain point "difficult to clean" → technical requirement "fully detachable structure, no dead corners, dishwasher-safe").
+4. Competitor analysis must list at least 3 main competitors per target market, comparing features, pricing, strengths, and weaknesses.
+5. The "Key Technical Requirements" in Part 4 must be directly linked to the pain points identified earlier, specifying quantitative metrics (e.g., noise ≤30dB, feeding accuracy error <5%, food-grade stainless steel).
+6. All tables must contain concrete data (amounts, percentages, scores, etc.) – never leave cells empty or write "to be added".
 
 # Product Feasibility Analysis Report
 ## {product_name}
@@ -714,19 +726,19 @@ You are a senior product analyst and R&D consultant with 25 years of experience 
 
 ### 1.1 Market Size & Trends
 
-(For each target market, list market size (with year and amount), growth rate, key drivers, and barriers in a table)
+**Provide separate analysis for each target market.** Each market should have its own table or subsection including: market size (year and amount), growth rate, key drivers, key barriers.
 
 ### 1.2 User Persona
 
-(Describe core user characteristics in a table: age, gender, income, pet type, purchase motivation, price sensitivity, info channels)
+**Describe user persona separately for each target market** – age, gender, income, pet type, purchase motivation, price sensitivity, info channels. Use tables or bullet points.
 
 ### 1.3 User Pain Points
 
-(List 3-5 core pain points in a table: pain point, frequency (High/Medium/Low), description)
+**List 3-5 core pain points per target market** in a table: pain point, frequency (High/Medium/Low), description. **After each pain point, derive corresponding technical parameter requirements** (e.g., pain point "hard to clean" → technical requirement "fully removable parts, dishwasher-safe, no dead corners").
 
 ### 1.4 Key Feature Priority
 
-(List features, importance score (1-10), explanation in a table)
+Based on the pain points above, list cross-market key features with importance score (1-10) and explanation in a table.
 
 ---
 
@@ -734,15 +746,15 @@ You are a senior product analyst and R&D consultant with 25 years of experience 
 
 ### 2.1 Main Competitors
 
-(List at least 3 main competitors in a table: brand, product/model, strengths, weaknesses, price range)
+**List at least 3 main competitors per target market** in a table: brand, product/model, strengths, weaknesses, price range.
 
 ### 2.2 Feature Comparison
 
-(Compare 5-6 key features in a table: feature, competitor A, competitor B, competitor C, gap opportunity)
+**For each target market, compare 5-6 key features** in a table: feature, competitor A, competitor B, competitor C, gap opportunity.
 
 ### 2.3 Market Gap Summary
 
-(List at least 3 market gaps with brief explanation)
+List at least 3 cross-market gap opportunities with brief explanation.
 
 ---
 
@@ -750,7 +762,7 @@ You are a senior product analyst and R&D consultant with 25 years of experience 
 
 ### 3.1 Target Market Channel Structure
 
-(Describe channel types, share, characteristics, suitability in a table, split by China and US)
+**Describe channel types, share, characteristics, suitability separately for each target market** in a table.
 
 ### 3.2 Client's Current Channel Status
 
@@ -758,7 +770,7 @@ You are a senior product analyst and R&D consultant with 25 years of experience 
 
 ### 3.3 Channel Strategy Recommendations
 
-(Provide channel expansion recommendations by year in a table: phase, market, channel strategy, specific actions)
+Provide channel expansion recommendations by year in a table: phase, market, channel strategy, specific actions.
 
 ---
 
@@ -766,15 +778,15 @@ You are a senior product analyst and R&D consultant with 25 years of experience 
 
 ### 4.1 Key Technical Requirements
 
-(List technology, requirement, client capability, risk level (High/Medium/Low) in a table)
+**Must directly map to pain points from Part 1.** Use a table with: technology item, corresponding pain point, specific technical requirement (quantified), client capability, risk level (High/Medium/Low). Example: pain point "hard to clean" → technology "modular quick-release" → requirement "≤3 steps to disassemble, dishwasher-safe".
 
 ### 4.2 Development Timeline Estimate
 
-(List phase, duration, key tasks in a table)
+List phase, duration, key tasks in a table.
 
 ### 4.3 Key Risk Points
 
-(List risk, probability (High/Medium/Low), impact (High/Medium/Low), mitigation in a table)
+List risk, probability (High/Medium/Low), impact (High/Medium/Low), mitigation in a table.
 
 ---
 
@@ -782,15 +794,15 @@ You are a senior product analyst and R&D consultant with 25 years of experience 
 
 ### 5.1 Forecast Assumptions
 
-(List pricing, target market, share assumptions in bullet points)
+List pricing, target market, share assumptions in bullet points.
 
 ### 5.2 Sales Forecast
 
-(3-year forecast in a table: year, US market, China market, total revenue, key assumptions)
+3-year forecast in a table: year, US market, China market, total revenue, key assumptions.
 
 ### 5.3 ROI Estimate
 
-(List R&D investment, marketing, first production cost, total capital, gross margin, breakeven point in a table)
+List R&D investment, marketing, first production cost, total capital, gross margin, breakeven point in a table.
 
 ---
 
@@ -798,15 +810,15 @@ You are a senior product analyst and R&D consultant with 25 years of experience 
 
 ### 6.1 Comprehensive Evaluation
 
-(Score each dimension: Market Attractiveness, Technical Feasibility, Channel Fit, Competitive Landscape, ROI Potential out of 10, with explanation in a table)
+Score each dimension: Market Attractiveness, Technical Feasibility, Channel Fit, Competitive Landscape, ROI Potential out of 10, with explanation in a table.
 
 ### 6.2 Differentiation Positioning Recommendations
 
-(Provide 2-3 positioning options in a table: positioning, advantages, risks)
+Provide 2-3 positioning options in a table: positioning, advantages, risks.
 
 ### 6.3 Final Recommendation
 
-(Provide overall score (e.g., X/10) and a conclusion like "Recommended / Highly Recommended / Not Recommended", plus 5 specific next steps)
+Provide overall score (e.g., X/10) and a conclusion like "Recommended / Highly Recommended / Not Recommended", plus 5 specific next steps.
 
 ---
 
