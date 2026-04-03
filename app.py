@@ -464,7 +464,7 @@ def admin_settings_dialog():
         st.markdown("18元 / 3美元")
         st.markdown("1次 · 无有效期")
         if st.button("生成单次通行码"):
-            new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=1, custom_months=9999)
+            new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=3, custom_months=9999)
             st.success(f"单次通行授权码：")
             st.code(new_key, language="text")
             st.write(f"次数：{max_uses}，有效期：无限制（至 {expiry_str[:10]}）")
@@ -945,7 +945,7 @@ if "order_success" in params and "plan" in params:
     # 根据语言和套餐设置 uses, months, plan_name
     if current_lang == "zh":
         if plan == "single":
-            uses = 1
+            uses = 3
             months = 9999
             plan_name = "单次通行"
         elif plan == "100":
@@ -962,7 +962,7 @@ if "order_success" in params and "plan" in params:
             plan_name = "未知"
     else:  # English
         if plan == "single":
-            uses = 1
+            uses = 3
             months = 9999
             plan_name = "Single Pass"
         elif plan == "100":
