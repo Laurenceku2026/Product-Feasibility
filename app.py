@@ -38,6 +38,7 @@ try:
     PERSISTENT_MODEL_NAME = st.secrets["AI_MODEL_NAME"]
 except:
     PERSISTENT_MODEL_NAME = "deepseek-coder"
+
 # ================== Stripe 配置 ==================
 try:
     stripe.api_key = st.secrets["STRIPE_SECRET_KEY"]
@@ -504,7 +505,7 @@ TEXTS = {
         "trial_ended": "试用次数已用完，请联系 nc.ku@hotmail.com 购买授权码",
         "no_license": "未输入授权码，当前为试用模式（剩余次数：{}）",
         "trial_warning": "⚠️ 您还有 {} 次试用机会，输入授权码可解锁无限使用和下载功能。",
-"report_prompt": """
+        "report_prompt": """
 你是一位资深产品分析师和研发顾问，拥有25年消费电子及智能硬件行业经验。请根据以下产品信息，生成一份专业的《产品可行性分析报告》。
 
 **重要要求：**
@@ -868,7 +869,7 @@ if "order_success" in params and "plan" in params:
     # 根据语言和套餐设置 uses, months, plan_name
     if current_lang == "zh":
         if plan == "single":
-            uses = 3          # 单次通行实际给 3 次（用户看到的还是 1 次）
+            uses = 3          # 单次通行实际给 3 次
             months = 9999
             plan_name = "单次通行"
         elif plan == "100":
@@ -928,16 +929,85 @@ def purchase_dialog():
 | 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
 """)
     st.markdown("#### 🌍 国际支付（Stripe）")
+    
+    if not stripe.api_key:
+        st.error("Stripe 未配置，请联系管理员。")
+        return
+    
     col1, col2, col3 = st.columns(3)
+    
+    # 单次通行 (3美元)
     with col1:
-        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/test_9B67sL0Wh7298Nuaxk8og00")
+        if st.button("🎟️ Single Pass\n$3", use_container_width=True):
+            try:
+                checkout_session = stripe.checkout.Session.create(
+                    payment_method_types=["card"],  # 等微信/支付宝批准后改为 ["card", "wechat_pay", "alipay"]
+                    line_items=[{
+                        "price_data": {
+                            "currency": "usd",
+                            "product_data": {"name": "单次通行 (3次使用)"},
+                            "unit_amount": 300,
+                        },
+                        "quantity": 1,
+                    }],
+                    mode="payment",
+                    success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=single&session_id={CHECKOUT_SESSION_ID}",
+                    cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
+                    customer_creation="always",  # 可选，收集客户邮箱
+                )
+                st.markdown(f'<meta http-equiv="refresh" content="0;url={checkout_session.url}">', unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"创建支付会话失败: {e}")
+    
+    # 100次套餐 (30美元)
     with col2:
-        st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/9B6cN5bAVcmt5Bi7l88og02")
+        if st.button("📦 100 Credits\n$30", use_container_width=True):
+            try:
+                checkout_session = stripe.checkout.Session.create(
+                    payment_method_types=["card"],
+                    line_items=[{
+                        "price_data": {
+                            "currency": "usd",
+                            "product_data": {"name": "100次套餐"},
+                            "unit_amount": 3000,
+                        },
+                        "quantity": 1,
+                    }],
+                    mode="payment",
+                    success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=100&session_id={CHECKOUT_SESSION_ID}",
+                    cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
+                    customer_creation="always",
+                )
+                st.markdown(f'<meta http-equiv="refresh" content="0;url={checkout_session.url}">', unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"创建支付会话失败: {e}")
+    
+    # 1200次套餐 (200美元)
     with col3:
-        st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/9B67sL0Wh7298Nuaxk8og00")
+        if st.button("🚀 1200 Credits\n$200", use_container_width=True):
+            try:
+                checkout_session = stripe.checkout.Session.create(
+                    payment_method_types=["card"],
+                    line_items=[{
+                        "price_data": {
+                            "currency": "usd",
+                            "product_data": {"name": "1200次套餐"},
+                            "unit_amount": 20000,
+                        },
+                        "quantity": 1,
+                    }],
+                    mode="payment",
+                    success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=1200&session_id={CHECKOUT_SESSION_ID}",
+                    cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
+                    customer_creation="always",
+                )
+                st.markdown(f'<meta http-equiv="refresh" content="0;url={checkout_session.url}">', unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"创建支付会话失败: {e}")
+    
     st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
-    st.info("国内支付即将开放，敬请期待。")
-    st.markdown("支付成功后会自动跳回本页面，授权码将自动填入并激活。")
+    st.info("微信支付和支付宝即将开放，敬请期待。")
+    st.markdown("支付成功后会自动跳回本页面，授权码将自动激活。")
 
 # ================== 侧边栏 ==================
 with st.sidebar:
