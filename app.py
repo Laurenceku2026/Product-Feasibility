@@ -41,7 +41,7 @@ except:
 try:
     PERSISTENT_MODEL_NAME = st.secrets["AI_MODEL_NAME"]
 except:
-    PERSISTENT_MODEL_NAME = "deepseek-coder"   # 已切换为 deepseek-coder
+    PERSISTENT_MODEL_NAME = "deepseek-coder"
 
 # ================== 从 secrets 读取 SMTP 邮件配置 ==================
 try:
@@ -279,7 +279,6 @@ def add_security_css(disable=False):
                 transparent 42px, transparent 80px);
             background-size: 80px 80px;
         }
-        /* 让网页表格边框变为浅灰色 */
         table, th, td {
             border: 1px solid #CCCCCC !important;
             border-collapse: collapse;
@@ -320,7 +319,7 @@ def add_dynamic_watermark(lang, hide):
     </div>
     """, unsafe_allow_html=True)
 
-# ================== Word 表格生成（浅灰边框） ==================
+# ================== Word 表格生成 ==================
 def set_cell_border(cell, border_color=RGBColor(0xCC, 0xCC, 0xCC)):
     tc = cell._tc
     tcPr = tc.get_or_add_tcPr()
@@ -375,7 +374,6 @@ def markdown_to_docx(md_text, doc, lang):
                     table.style = 'Table Grid'
                     table.autofit = True
                     table.width = Inches(6.5)
-                    # 为所有单元格设置浅灰边框
                     for row in table.rows:
                         for cell in row.cells:
                             set_cell_border(cell, RGBColor(0xCC, 0xCC, 0xCC))
@@ -514,7 +512,7 @@ with col4:
         else:
             admin_login_dialog()
 
-# ================== 语言文本（强制完整输出 + 浅灰表格 + 网址） ==================
+# ================== 语言文本 ==================
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -579,7 +577,6 @@ TEXTS = {
         "trial_ended": "试用次数已用完，请联系 nc.ku@hotmail.com 购买授权码",
         "no_license": "未输入授权码，当前为试用模式（剩余次数：{}）",
         "trial_warning": "⚠️ 您还有 {} 次试用机会，输入授权码可解锁无限使用和下载功能。",
-        # ================== 修改后的 prompt：添加网址 ==================
         "report_prompt": """
 你是一位资深产品分析师和研发顾问，拥有25年消费电子及智能硬件行业经验。请根据以下产品信息，生成一份专业的《产品可行性分析报告》。
 
@@ -769,7 +766,6 @@ TEXTS = {
         "trial_ended": "Trial credits used up, please contact nc.ku@hotmail.com to purchase a license",
         "no_license": "No Report Key entered. Trial mode (remaining credits: {})",
         "trial_warning": "⚠️ You have {} trial credits left. Enter a license key to unlock unlimited usage and download.",
-        # ================== 修改后的英文 prompt：添加网址 ==================
         "report_prompt": """
 You are a senior product analyst and R&D consultant with 25 years of experience in consumer electronics and smart hardware. Based on the following product information, generate a professional "Product Feasibility Analysis Report".
 
@@ -906,7 +902,39 @@ t["trial_warning"] = t["trial_warning"].format(st.session_state.trial_uses_left)
 
 st.title(t["title"])
 
-# ================== 支付回调处理 ==================
+# ================== 支付成功弹窗（必须放在 st.title 之后，任何 UI 之前） ==================
+if st.session_state.get("show_payment_dialog", False):
+    @st.dialog("✅ 支付成功")
+    def payment_success_dialog():
+        st.markdown("### 您的授权码已生成")
+        st.code(st.session_state.payment_new_key, language="text")
+        st.caption("请妥善保管此授权码，下次使用时可手动复制并粘贴到左侧输入框。")
+        
+        # 检测当前页面是否有报告内容
+        has_report = st.session_state.report_content_zh is not None or st.session_state.report_content_en is not None
+        if not has_report:
+            st.warning("⚠️ 检测到您可能在新窗口中完成支付。请关闭当前窗口，回到您原先生成报告的那个窗口，报告水印将自动去除，您可以下载Word文档。")
+        else:
+            st.success("✅ 授权码已自动激活，报告水印已去除，您现在可以下载Word文档。")
+        
+        if st.session_state.get("payment_email_sent") is True:
+            st.success("✅ 授权码已同时发送至您的邮箱。")
+        elif st.session_state.get("payment_email_sent") is False:
+            st.warning(f"⚠️ 邮件发送失败，请联系客服。\n\n错误：{st.session_state.get('payment_email_error', '未知错误')}")
+        else:
+            st.info("未获取到您的邮箱，请手动保存以上授权码。")
+        
+        st.markdown("---")
+        if st.button("确定", use_container_width=True):
+            # 清除弹窗标志和临时数据
+            st.session_state.show_payment_dialog = False
+            for key in ["payment_new_key", "payment_plan_name", "payment_email_sent", "payment_email_error"]:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
+    
+    payment_success_dialog()
+
 # ================== 支付回调处理 ==================
 params = st.query_params
 if "order_success" in params and "plan" in params:
@@ -953,26 +981,28 @@ if "order_success" in params and "plan" in params:
     if uses > 0:
         new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
         st.session_state.current_report_key = new_key
+        st.session_state.payment_new_key = new_key
+        st.session_state.payment_plan_name = plan_name
         
+        # 尝试发送邮件
+        email_sent = False
+        email_error = None
         if customer_email:
             success, msg = send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
-            if success:
-                st.success("✅ 授权码已同时发送至您的邮箱。")
-            else:
-                st.warning(f"⚠️ 邮件发送失败，请联系客服。错误：{msg}")
-        else:
-            st.info("未获取到您的邮箱，授权码仅显示在下方。")
+            email_sent = success
+            email_error = msg if not success else None
+        st.session_state.payment_email_sent = email_sent
+        st.session_state.payment_email_error = email_error
         
-        # 显示成功消息和授权码（无复制按钮）
-        st.success(f"✅ 支付成功！您的授权码已生成：")
-        st.code(new_key, language="text")
-        st.caption("请妥善保管此授权码，下次使用时可手动复制并粘贴到左侧输入框。")
-        st.info("页面即将刷新，授权码将自动生效...")
-        time.sleep(2)
+        # 清除 URL 参数，避免重复触发
+        st.query_params.clear()
+        # 设置标志，显示支付成功弹窗
+        st.session_state.show_payment_dialog = True
         st.rerun()
     else:
         st.error("❌ 支付失败或套餐无效，请联系客服。")
         st.query_params.clear()
+
 # ================== 购买对话框 ==================
 @st.dialog("购买+解锁")
 def purchase_dialog():
@@ -1145,7 +1175,7 @@ if submitted:
                             model=st.session_state.ai_model_name,
                             messages=[{"role": "user", "content": prompt}],
                             temperature=0.7,
-                            max_tokens=8000  # 确保完整输出
+                            max_tokens=8000
                         )
                         report_content = response.choices[0].message.content
                         if lang == "zh":
