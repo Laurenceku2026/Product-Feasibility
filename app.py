@@ -957,18 +957,13 @@ if "order_success" in params and "plan" in params:
                 st.warning(f"⚠️ 邮件发送失败，请联系客服。错误：{msg}")
         else:
             st.info("未获取到您的邮箱，授权码仅显示在下方。")
-        st.success(f"✅ 支付成功！您的授权码已生成并自动填入下方输入框。")
-        copy_js = f"""
-        <div style="background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin-top: 10px;">
-            <code style="font-size: 16px;">{new_key}</code>
-            <button onclick="navigator.clipboard.writeText('{new_key}')" style="margin-left: 10px;">📋 复制授权码</button>
-        </div>
-        <p style="margin-top: 10px;">⚠️ 请务必保存好此授权码，下次使用时可复制粘贴到左侧输入框。</p>
-        """
-        st.markdown(copy_js, unsafe_allow_html=True)
-        st.info("页面即将刷新，授权码将自动生效...")
-        time.sleep(2)
-        st.rerun()
+# 显示成功消息和授权码（无复制按钮）
+st.success(f"✅ 支付成功！您的授权码已生成：")
+st.code(new_key, language="text")
+st.caption("请妥善保管此授权码，下次使用时可手动复制并粘贴到左侧输入框。")
+st.info("页面即将刷新，授权码将自动生效...")
+time.sleep(2)
+st.rerun()
     else:
         st.error("❌ 支付失败或套餐无效，请联系客服。")
         st.query_params.clear()
