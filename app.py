@@ -917,7 +917,7 @@ if "order_success" in params and "plan" in params:
         st.error("❌ 支付失败或套餐无效，请联系客服。")
         st.query_params.clear()
 
-# ================== 购买对话框（自动跳转） ==================
+# ================== 购买对话框（自动在新标签页打开 Stripe） ==================
 @st.dialog("购买+解锁")
 def purchase_dialog():
     st.markdown("### 选择套餐")
@@ -952,16 +952,15 @@ def purchase_dialog():
                     }],
                     mode="payment",
                     payment_method_options={
-                        "wechat_pay": {
-                            "client": "web"
-                        }
+                        "wechat_pay": {"client": "web"}
                     },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=single",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                # 自动跳转
-                st.markdown(f'<script>window.location.href = "{checkout_session.url}";</script>', unsafe_allow_html=True)
+                # 在新标签页自动打开 Stripe 支付页面
+                st.markdown(f'<script>window.open("{checkout_session.url}", "_blank");</script>', unsafe_allow_html=True)
+                st.success("✅ 支付页面已在新标签页打开，请完成支付。")
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}")
     
@@ -981,15 +980,14 @@ def purchase_dialog():
                     }],
                     mode="payment",
                     payment_method_options={
-                        "wechat_pay": {
-                            "client": "web"
-                        }
+                        "wechat_pay": {"client": "web"}
                     },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=100",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                st.markdown(f'<script>window.location.href = "{checkout_session.url}";</script>', unsafe_allow_html=True)
+                st.markdown(f'<script>window.open("{checkout_session.url}", "_blank");</script>', unsafe_allow_html=True)
+                st.success("✅ 支付页面已在新标签页打开，请完成支付。")
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}")
     
@@ -1009,15 +1007,14 @@ def purchase_dialog():
                     }],
                     mode="payment",
                     payment_method_options={
-                        "wechat_pay": {
-                            "client": "web"
-                        }
+                        "wechat_pay": {"client": "web"}
                     },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=1200",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                st.markdown(f'<script>window.location.href = "{checkout_session.url}";</script>', unsafe_allow_html=True)
+                st.markdown(f'<script>window.open("{checkout_session.url}", "_blank");</script>', unsafe_allow_html=True)
+                st.success("✅ 支付页面已在新标签页打开，请完成支付。")
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}")
     
