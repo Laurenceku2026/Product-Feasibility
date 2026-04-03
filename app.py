@@ -917,7 +917,7 @@ if "order_success" in params and "plan" in params:
         st.error("❌ 支付失败或套餐无效，请联系客服。")
         st.query_params.clear()
 
-# ================== 购买对话框（自动在新标签页打开 Stripe） ==================
+# ================== 购买对话框 ==================
 @st.dialog("购买+解锁")
 def purchase_dialog():
     st.markdown("### 选择套餐")
@@ -941,26 +941,27 @@ def purchase_dialog():
         if st.button("🎟️ Single Pass\n$3", use_container_width=True):
             try:
                 checkout_session = stripe.checkout.Session.create(
-                    payment_method_types=["card", "alipay", "wechat_pay"],
+                    payment_method_types=["card", "alipay", "wechat_pay"],  # 支持信用卡、支付宝、微信支付
                     line_items=[{
                         "price_data": {
-                            "currency": "cny",
+                            "currency": "cny",  # 使用人民币，Stripe 自动转换美元
                             "product_data": {"name": "单次通行 (3次使用)"},
-                            "unit_amount": 2100,
+                            "unit_amount": 2100,  # 21.00 元 (约 3 美元)
                         },
                         "quantity": 1,
                     }],
                     mode="payment",
                     payment_method_options={
-                        "wechat_pay": {"client": "web"}
+                        "wechat_pay": {
+                            "client": "web"  # 必须指定为网页端
+                        }
                     },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=single",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                # 在新标签页自动打开 Stripe 支付页面
-                st.markdown(f'<script>window.open("{checkout_session.url}", "_blank");</script>', unsafe_allow_html=True)
-                st.success("✅ 支付页面已在新标签页打开，请完成支付。")
+                st.success("✅ 支付链接已生成，请点击下方按钮完成支付")
+                st.link_button("前往 Stripe 支付页面", checkout_session.url)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}")
     
@@ -974,20 +975,22 @@ def purchase_dialog():
                         "price_data": {
                             "currency": "cny",
                             "product_data": {"name": "100次套餐"},
-                            "unit_amount": 21000,
+                            "unit_amount": 21000,  # 210.00 元
                         },
                         "quantity": 1,
                     }],
                     mode="payment",
                     payment_method_options={
-                        "wechat_pay": {"client": "web"}
+                        "wechat_pay": {
+                            "client": "web"
+                        }
                     },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=100",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                st.markdown(f'<script>window.open("{checkout_session.url}", "_blank");</script>', unsafe_allow_html=True)
-                st.success("✅ 支付页面已在新标签页打开，请完成支付。")
+                st.success("✅ 支付链接已生成，请点击下方按钮完成支付")
+                st.link_button("前往 Stripe 支付页面", checkout_session.url)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}")
     
@@ -1001,20 +1004,22 @@ def purchase_dialog():
                         "price_data": {
                             "currency": "cny",
                             "product_data": {"name": "1200次套餐"},
-                            "unit_amount": 140000,
+                            "unit_amount": 140000,  # 1400.00 元
                         },
                         "quantity": 1,
                     }],
                     mode="payment",
                     payment_method_options={
-                        "wechat_pay": {"client": "web"}
+                        "wechat_pay": {
+                            "client": "web"
+                        }
                     },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=1200",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                st.markdown(f'<script>window.open("{checkout_session.url}", "_blank");</script>', unsafe_allow_html=True)
-                st.success("✅ 支付页面已在新标签页打开，请完成支付。")
+                st.success("✅ 支付链接已生成，请点击下方按钮完成支付")
+                st.link_button("前往 Stripe 支付页面", checkout_session.url)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}")
     
