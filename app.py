@@ -6,14 +6,9 @@ import re
 import secrets
 import string
 import time
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.header import Header
 from io import BytesIO
 from docx import Document
-from docx.shared import Pt, Inches, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Inches, RGBColor
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from datetime import datetime, timedelta
@@ -42,80 +37,6 @@ try:
     PERSISTENT_MODEL_NAME = st.secrets["AI_MODEL_NAME"]
 except:
     PERSISTENT_MODEL_NAME = "deepseek-coder"
-
-# ================== 从 secrets 读取 SMTP 邮件配置 ==================
-try:
-    SMTP_SERVER = st.secrets["SMTP_SERVER"]
-    SMTP_PORT = st.secrets["SMTP_PORT"]
-    SMTP_USER = st.secrets["SMTP_USER"]
-    SMTP_PASSWORD = st.secrets["SMTP_PASSWORD"]
-except:
-    SMTP_SERVER = ""
-    SMTP_PORT = 587
-    SMTP_USER = ""
-    SMTP_PASSWORD = ""
-
-def send_license_email(to_email, license_key, plan_name, uses, expiry, lang="zh"):
-    if not SMTP_USER or not SMTP_PASSWORD:
-        return False, "邮件服务未配置"
-    if lang == "zh":
-        subject = f"您的产品可行性分析系统授权码 - {plan_name}"
-        body = f"""
-亲爱的用户：
-
-感谢您对 Techlife 产品的信任！
-
-您的产品分析报告通行证已生成，详情如下：
-
-- 授权码：{license_key}
-- 套餐：{plan_name}
-- 可用次数：{uses}
-- 有效期至：{expiry}
-
-请在系统左侧边栏的“授权码 (Report Key)”输入框中输入此授权码，即可解锁高级功能（无水印、可下载 Word 报告）。
-
-请妥善保管此授权码，如有疑问请联系：nc.ku@hotmail.com
-
-祝您使用愉快！
-
-Techlife 产品可行性分析系统
-"""
-    else:
-        subject = f"Your License Key for Product Feasibility Analysis System - {plan_name}"
-        body = f"""
-Dear Customer,
-
-Thank you for trusting Techlife products!
-
-Your product analysis report pass has been generated. Details are as follows:
-
-- License Key: {license_key}
-- Plan: {plan_name}
-- Available uses: {uses}
-- Valid until: {expiry}
-
-Please enter this license key in the "Report Key" input box on the left sidebar to unlock advanced features (no watermark, Word report download available).
-
-Please keep this license key safe. If you have any questions, please contact: nc.ku@hotmail.com
-
-Best regards,
-
-Techlife Product Feasibility Analysis System
-"""
-    msg = MIMEMultipart()
-    msg['From'] = SMTP_USER
-    msg['To'] = to_email
-    msg['Subject'] = Header(subject, 'utf-8')
-    msg.attach(MIMEText(body, 'plain', 'utf-8'))
-    try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(SMTP_USER, SMTP_PASSWORD)
-        server.sendmail(SMTP_USER, [to_email], msg.as_string())
-        server.quit()
-        return True, ""
-    except Exception as e:
-        return False, str(e)
 
 # ================== 授权类型定义 ==================
 LICENSE_TYPES = {
@@ -319,7 +240,7 @@ def add_dynamic_watermark(lang, hide):
     </div>
     """, unsafe_allow_html=True)
 
-# ================== Word 表格生成 ==================
+# ================== Word 表格生成（浅灰边框） ==================
 def set_cell_border(cell, border_color=RGBColor(0xCC, 0xCC, 0xCC)):
     tc = cell._tc
     tcPr = tc.get_or_add_tcPr()
@@ -462,7 +383,7 @@ def admin_settings_dialog():
     with col_price1:
         st.markdown("**单次通行**")
         st.markdown("18元 / 3美元")
-        st.markdown("1次 · 无有效期")
+        st.markdown("3次 · 无有效期")
         if st.button("生成单次通行码"):
             new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=3, custom_months=9999)
             st.success(f"单次通行授权码：")
@@ -902,33 +823,18 @@ t["trial_warning"] = t["trial_warning"].format(st.session_state.trial_uses_left)
 
 st.title(t["title"])
 
-# ================== 支付成功弹窗（必须放在 st.title 之后，任何 UI 之前） ==================
+# ================== 支付成功弹窗 ==================
 if st.session_state.get("show_payment_dialog", False):
     @st.dialog("✅ 支付成功")
     def payment_success_dialog():
         st.markdown("### 您的授权码已生成")
         st.code(st.session_state.payment_new_key, language="text")
         st.caption("请妥善保管此授权码，下次使用时可手动复制并粘贴到左侧输入框。")
-        
-        # 检测当前页面是否有报告内容
-        has_report = st.session_state.report_content_zh is not None or st.session_state.report_content_en is not None
-        if not has_report:
-            st.warning("⚠️ 检测到您可能在新窗口中完成支付。请关闭当前窗口，回到您原先生成报告的那个窗口，报告水印将自动去除，您可以下载Word文档。")
-        else:
-            st.success("✅ 授权码已自动激活，报告水印已去除，您现在可以下载Word文档。")
-        
-        if st.session_state.get("payment_email_sent") is True:
-            st.success("✅ 授权码已同时发送至您的邮箱。")
-        elif st.session_state.get("payment_email_sent") is False:
-            st.warning(f"⚠️ 邮件发送失败，请联系客服。\n\n错误：{st.session_state.get('payment_email_error', '未知错误')}")
-        else:
-            st.info("未获取到您的邮箱，请手动保存以上授权码。")
-        
+        st.info("🔑 请复制上方授权码，然后关闭本窗口，回到您原先生成报告的那个窗口，将授权码粘贴到左侧边栏输入框中即可解锁下载。")
         st.markdown("---")
         if st.button("确定", use_container_width=True):
-            # 清除弹窗标志和临时数据
             st.session_state.show_payment_dialog = False
-            for key in ["payment_new_key", "payment_plan_name", "payment_email_sent", "payment_email_error"]:
+            for key in ["payment_new_key", "payment_plan_name"]:
                 if key in st.session_state:
                     del st.session_state[key]
             st.rerun()
@@ -936,11 +842,9 @@ if st.session_state.get("show_payment_dialog", False):
     payment_success_dialog()
 
 # ================== 支付回调处理 ==================
-# ================== 支付回调处理 ==================
 params = st.query_params
 if "order_success" in params and "plan" in params:
     plan = params["plan"]
-    customer_email = params.get("email", None)
     current_lang = st.session_state.lang
     
     # 根据语言和套餐设置 uses, months, plan_name
@@ -963,7 +867,7 @@ if "order_success" in params and "plan" in params:
             plan_name = "未知"
     else:  # English
         if plan == "single":
-            uses = 3          # 单次通行实际给 3 次
+            uses = 3
             months = 9999
             plan_name = "Single Pass"
         elif plan == "100":
@@ -985,22 +889,6 @@ if "order_success" in params and "plan" in params:
         st.session_state.payment_new_key = new_key
         st.session_state.payment_plan_name = plan_name
         
-        # 尝试发送邮件（验证邮箱有效性，避免 ICHECKOUT_EMAIL 占位符）
-        email_sent = False
-        email_error = None
-        # 直接从 params 获取邮箱（避免变量作用域问题）
-        customer_email_from_params = params.get("email", None)
-        if customer_email_from_params and '@' in customer_email_from_params and '.' in customer_email_from_params and customer_email_from_params != 'ICHECKOUT_EMAIL':
-            success, msg = send_license_email(customer_email_from_params, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
-            email_sent = success
-            email_error = msg if not success else None
-        else:
-            email_sent = None
-            email_error = None
-        
-        st.session_state.payment_email_sent = email_sent
-        st.session_state.payment_email_error = email_error
-        
         # 清除 URL 参数，避免重复触发
         st.query_params.clear()
         # 设置标志，显示支付成功弹窗
@@ -1009,9 +897,7 @@ if "order_success" in params and "plan" in params:
     else:
         st.error("❌ 支付失败或套餐无效，请联系客服。")
         st.query_params.clear()
-    # 设置标志，显示支付成功弹窗
-    st.session_state.show_payment_dialog = True
-    st.rerun()
+
 # ================== 购买对话框 ==================
 @st.dialog("购买+解锁")
 def purchase_dialog():
@@ -1019,7 +905,7 @@ def purchase_dialog():
     st.markdown("""
 | 套餐 | 价格 | 次数 | 有效期 |
 |------|------|------|--------|
-| 单次通行 | 18元 / 3美元 | 1次 | 无限制 |
+| 单次通行 | 18元 / 3美元 | 3次 | 无限制 |
 | 100次套餐 | 180元 / 30美元 | 100次 | 1个月 |
 | 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
 """)
