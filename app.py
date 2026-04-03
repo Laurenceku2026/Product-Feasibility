@@ -907,6 +907,31 @@ t["trial_warning"] = t["trial_warning"].format(st.session_state.trial_uses_left)
 st.title(t["title"])
 
 # ================== 支付回调处理 ==================
+# ================== 支付成功弹窗 ==================
+if st.session_state.get("show_payment_dialog", False):
+    @st.dialog("✅ 支付成功")
+    def payment_success_dialog():
+        st.markdown("### 您的授权码已生成")
+        st.code(st.session_state.payment_new_key, language="text")
+        st.caption("请妥善保管此授权码，下次使用时可手动复制并粘贴到左侧输入框。")
+        
+        if st.session_state.get("payment_email_sent") is True:
+            st.success("✅ 授权码已同时发送至您的邮箱。")
+        elif st.session_state.get("payment_email_sent") is False:
+            st.warning(f"⚠️ 邮件发送失败，请联系客服。\n\n错误：{st.session_state.get('payment_email_error', '未知错误')}")
+        else:
+            st.info("未获取到您的邮箱，请手动保存以上授权码。")
+        
+        st.markdown("---")
+        if st.button("确定", use_container_width=True):
+            # 清除弹窗标志和临时数据
+            st.session_state.show_payment_dialog = False
+            for key in ["payment_new_key", "payment_plan_name", "payment_email_sent", "payment_email_error"]:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
+    
+    payment_success_dialog()
 # ================== 支付回调处理 ==================
 params = st.query_params
 if "order_success" in params and "plan" in params:
@@ -950,29 +975,30 @@ if "order_success" in params and "plan" in params:
             months = 0
             plan_name = "Unknown"
     
-    if uses > 0:
-        new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
-        st.session_state.current_report_key = new_key
-        
-        if customer_email:
-            success, msg = send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
-            if success:
-                st.success("✅ 授权码已同时发送至您的邮箱。")
-            else:
-                st.warning(f"⚠️ 邮件发送失败，请联系客服。错误：{msg}")
-        else:
-            st.info("未获取到您的邮箱，授权码仅显示在下方。")
-        
-        # 显示成功消息和授权码（无复制按钮）
-        st.success(f"✅ 支付成功！您的授权码已生成：")
-        st.code(new_key, language="text")
-        st.caption("请妥善保管此授权码，下次使用时可手动复制并粘贴到左侧输入框。")
-        st.info("页面即将刷新，授权码将自动生效...")
-        time.sleep(2)
-        st.rerun()
-    else:
-        st.error("❌ 支付失败或套餐无效，请联系客服。")
-        st.query_params.clear()
+if uses > 0:
+    new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
+    st.session_state.current_report_key = new_key
+    st.session_state.payment_new_key = new_key          # 供弹窗显示
+    st.session_state.payment_plan_name = plan_name
+    
+    # 尝试发送邮件
+    email_sent = False
+    email_error = None
+    if customer_email:
+        success, msg = send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
+        email_sent = success
+        email_error = msg if not success else None
+    st.session_state.payment_email_sent = email_sent
+    st.session_state.payment_email_error = email_error
+    
+    # 清除 URL 参数，避免重复触发
+    st.query_params.clear()
+    # 设置标志，显示支付成功弹窗
+    st.session_state.show_payment_dialog = True
+    st.rerun()
+else:
+    st.error("❌ 支付失败或套餐无效，请联系客服。")
+    st.query_params.clear()
 # ================== 购买对话框 ==================
 @st.dialog("购买+解锁")
 def purchase_dialog():
