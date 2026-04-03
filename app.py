@@ -936,6 +936,7 @@ if st.session_state.get("show_payment_dialog", False):
     payment_success_dialog()
 
 # ================== 支付回调处理 ==================
+# ================== 支付回调处理 ==================
 params = st.query_params
 if "order_success" in params and "plan" in params:
     plan = params["plan"]
@@ -945,7 +946,7 @@ if "order_success" in params and "plan" in params:
     # 根据语言和套餐设置 uses, months, plan_name
     if current_lang == "zh":
         if plan == "single":
-            uses = 3
+            uses = 3          # 单次通行实际给 3 次（用户看到的还是 1 次）
             months = 9999
             plan_name = "单次通行"
         elif plan == "100":
@@ -962,7 +963,7 @@ if "order_success" in params and "plan" in params:
             plan_name = "未知"
     else:  # English
         if plan == "single":
-            uses = 3
+            uses = 3          # 单次通行实际给 3 次
             months = 9999
             plan_name = "Single Pass"
         elif plan == "100":
@@ -978,29 +979,36 @@ if "order_success" in params and "plan" in params:
             months = 0
             plan_name = "Unknown"
     
-if uses > 0:
-    new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
-    st.session_state.current_report_key = new_key
-    st.session_state.payment_new_key = new_key
-    st.session_state.payment_plan_name = plan_name
-    
-    # 尝试发送邮件（直接从 params 获取邮箱）
-    email_sent = False
-    email_error = None
-    customer_email_from_params = params.get("email", None)
-    if customer_email_from_params and '@' in customer_email_from_params and '.' in customer_email_from_params and customer_email_from_params != 'ICHECKOUT_EMAIL':
-        success, msg = send_license_email(customer_email_from_params, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
-        email_sent = success
-        email_error = msg if not success else None
-    else:
-        email_sent = None
+    if uses > 0:
+        new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
+        st.session_state.current_report_key = new_key
+        st.session_state.payment_new_key = new_key
+        st.session_state.payment_plan_name = plan_name
+        
+        # 尝试发送邮件（验证邮箱有效性，避免 ICHECKOUT_EMAIL 占位符）
+        email_sent = False
         email_error = None
-    
-    st.session_state.payment_email_sent = email_sent
-    st.session_state.payment_email_error = email_error
-    
-    # 清除 URL 参数，避免重复触发
-    st.query_params.clear()
+        # 直接从 params 获取邮箱（避免变量作用域问题）
+        customer_email_from_params = params.get("email", None)
+        if customer_email_from_params and '@' in customer_email_from_params and '.' in customer_email_from_params and customer_email_from_params != 'ICHECKOUT_EMAIL':
+            success, msg = send_license_email(customer_email_from_params, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
+            email_sent = success
+            email_error = msg if not success else None
+        else:
+            email_sent = None
+            email_error = None
+        
+        st.session_state.payment_email_sent = email_sent
+        st.session_state.payment_email_error = email_error
+        
+        # 清除 URL 参数，避免重复触发
+        st.query_params.clear()
+        # 设置标志，显示支付成功弹窗
+        st.session_state.show_payment_dialog = True
+        st.rerun()
+    else:
+        st.error("❌ 支付失败或套餐无效，请联系客服。")
+        st.query_params.clear()
     # 设置标志，显示支付成功弹窗
     st.session_state.show_payment_dialog = True
     st.rerun()
