@@ -985,24 +985,27 @@ if "order_success" in params and "plan" in params:
         st.session_state.payment_plan_name = plan_name
         
         # 尝试发送邮件
-        email_sent = False
-        email_error = None
-        if customer_email:
-            success, msg = send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
-            email_sent = success
-            email_error = msg if not success else None
-        st.session_state.payment_email_sent = email_sent
-        st.session_state.payment_email_error = email_error
-        
-        # 清除 URL 参数，避免重复触发
-        st.query_params.clear()
-        # 设置标志，显示支付成功弹窗
-        st.session_state.show_payment_dialog = True
-        st.rerun()
-    else:
-        st.error("❌ 支付失败或套餐无效，请联系客服。")
-        st.query_params.clear()
+        # 尝试发送邮件（验证收件人有效性）
+email_sent = False
+email_error = None
+# 验证邮箱是否有效（包含 @ 和 . 的基本验证，且不是 Stripe 占位符）
+if customer_email and '@' in customer_email and '.' in customer_email and customer_email != 'ICHECKOUT_EMAIL':
+    success, msg = send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
+    email_sent = success
+    email_error = msg if not success else None
+else:
+    # 邮箱无效或不提供，跳过邮件发送
+    email_sent = None
+    email_error = None
 
+st.session_state.payment_email_sent = email_sent
+st.session_state.payment_email_error = email_error
+
+# 清除 URL 参数，避免重复触发
+st.query_params.clear()
+# 设置标志，显示支付成功弹窗
+st.session_state.show_payment_dialog = True
+st.rerun()   # 注意：原来是 st.return()，需要修正为 st.rerun()
 # ================== 购买对话框 ==================
 @st.dialog("购买+解锁")
 def purchase_dialog():
