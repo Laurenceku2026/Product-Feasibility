@@ -941,7 +941,7 @@ def purchase_dialog():
         if st.button("🎟️ Single Pass\n$3", use_container_width=True):
             try:
                 checkout_session = stripe.checkout.Session.create(
-                    payment_method_types=["card"],  # 等微信/支付宝批准后改为 ["card", "wechat_pay", "alipay"]
+                    payment_method_types=["card", "wechat_pay", "alipay"],  # 包含微信/支付宝
                     line_items=[{
                         "price_data": {
                             "currency": "usd",
@@ -951,11 +951,13 @@ def purchase_dialog():
                         "quantity": 1,
                     }],
                     mode="payment",
-                    success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=single&session_id={CHECKOUT_SESSION_ID}",
+                    success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=single",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
-                    customer_creation="always",  # 可选，收集客户邮箱
+                    customer_creation="always",
                 )
-                st.markdown(f'<meta http-equiv="refresh" content="0;url={checkout_session.url}">', unsafe_allow_html=True)
+                st.session_state.single_url = checkout_session.url
+                st.success("✅ 支付链接已生成，请点击下方按钮完成支付")
+                st.link_button("前往 Stripe 支付页面", checkout_session.url)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}")
     
@@ -964,7 +966,7 @@ def purchase_dialog():
         if st.button("📦 100 Credits\n$30", use_container_width=True):
             try:
                 checkout_session = stripe.checkout.Session.create(
-                    payment_method_types=["card"],
+                    payment_method_types=["card", "wechat_pay", "alipay"],
                     line_items=[{
                         "price_data": {
                             "currency": "usd",
@@ -974,11 +976,13 @@ def purchase_dialog():
                         "quantity": 1,
                     }],
                     mode="payment",
-                    success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=100&session_id={CHECKOUT_SESSION_ID}",
+                    success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=100",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                st.markdown(f'<meta http-equiv="refresh" content="0;url={checkout_session.url}">', unsafe_allow_html=True)
+                st.session_state.hundred_url = checkout_session.url
+                st.success("✅ 支付链接已生成，请点击下方按钮完成支付")
+                st.link_button("前往 Stripe 支付页面", checkout_session.url)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}")
     
@@ -987,7 +991,7 @@ def purchase_dialog():
         if st.button("🚀 1200 Credits\n$200", use_container_width=True):
             try:
                 checkout_session = stripe.checkout.Session.create(
-                    payment_method_types=["card"],
+                    payment_method_types=["card", "wechat_pay", "alipay"],
                     line_items=[{
                         "price_data": {
                             "currency": "usd",
@@ -997,11 +1001,13 @@ def purchase_dialog():
                         "quantity": 1,
                     }],
                     mode="payment",
-                    success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=1200&session_id={CHECKOUT_SESSION_ID}",
+                    success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=1200",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                st.markdown(f'<meta http-equiv="refresh" content="0;url={checkout_session.url}">', unsafe_allow_html=True)
+                st.session_state.twelvehundred_url = checkout_session.url
+                st.success("✅ 支付链接已生成，请点击下方按钮完成支付")
+                st.link_button("前往 Stripe 支付页面", checkout_session.url)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}")
     
