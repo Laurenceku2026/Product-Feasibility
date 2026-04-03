@@ -986,6 +986,7 @@ if "order_success" in params and "plan" in params:
         
         # 尝试发送邮件
         # 尝试发送邮件（验证收件人有效性）
+# 尝试发送邮件（验证收件人有效性）
 email_sent = False
 email_error = None
 # 验证邮箱是否有效（包含 @ 和 . 的基本验证，且不是 Stripe 占位符）
@@ -1005,7 +1006,7 @@ st.session_state.payment_email_error = email_error
 st.query_params.clear()
 # 设置标志，显示支付成功弹窗
 st.session_state.show_payment_dialog = True
-st.rerun()   # 注意：原来是 st.return()，需要修正为 st.rerun()
+st.rerun()
 # ================== 购买对话框 ==================
 @st.dialog("购买+解锁")
 def purchase_dialog():
