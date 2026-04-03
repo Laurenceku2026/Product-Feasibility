@@ -579,7 +579,6 @@ TEXTS = {
         "trial_ended": "试用次数已用完，请联系 nc.ku@hotmail.com 购买授权码",
         "no_license": "未输入授权码，当前为试用模式（剩余次数：{}）",
         "trial_warning": "⚠️ 您还有 {} 次试用机会，输入授权码可解锁无限使用和下载功能。",
-        # ================== 修改后的 prompt：添加网址 ==================
         "report_prompt": """
 你是一位资深产品分析师和研发顾问，拥有25年消费电子及智能硬件行业经验。请根据以下产品信息，生成一份专业的《产品可行性分析报告》。
 
@@ -769,7 +768,6 @@ TEXTS = {
         "trial_ended": "Trial credits used up, please contact nc.ku@hotmail.com to purchase a license",
         "no_license": "No Report Key entered. Trial mode (remaining credits: {})",
         "trial_warning": "⚠️ You have {} trial credits left. Enter a license key to unlock unlimited usage and download.",
-        # ================== 修改后的英文 prompt：添加网址 ==================
         "report_prompt": """
 You are a senior product analyst and R&D consultant with 25 years of experience in consumer electronics and smart hardware. Based on the following product information, generate a professional "Product Feasibility Analysis Report".
 
@@ -906,7 +904,6 @@ t["trial_warning"] = t["trial_warning"].format(st.session_state.trial_uses_left)
 
 st.title(t["title"])
 
-# ================== 支付回调处理 ==================
 # ================== 支付成功弹窗 ==================
 if st.session_state.get("show_payment_dialog", False):
     @st.dialog("✅ 支付成功")
@@ -932,6 +929,7 @@ if st.session_state.get("show_payment_dialog", False):
             st.rerun()
     
     payment_success_dialog()
+
 # ================== 支付回调处理 ==================
 params = st.query_params
 if "order_success" in params and "plan" in params:
@@ -976,29 +974,30 @@ if "order_success" in params and "plan" in params:
             plan_name = "Unknown"
     
     if uses > 0:
-    new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
-    st.session_state.current_report_key = new_key
-    st.session_state.payment_new_key = new_key          # 供弹窗显示
-    st.session_state.payment_plan_name = plan_name
-    
-    # 尝试发送邮件
-    email_sent = False
-    email_error = None
-    if customer_email:
-        success, msg = send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
-        email_sent = success
-        email_error = msg if not success else None
-    st.session_state.payment_email_sent = email_sent
-    st.session_state.payment_email_error = email_error
-    
-    # 清除 URL 参数，避免重复触发
-    st.query_params.clear()
-    # 设置标志，显示支付成功弹窗
-    st.session_state.show_payment_dialog = True
-    st.rerun()
-else:
-    st.error("❌ 支付失败或套餐无效，请联系客服。")
-    st.query_params.clear()
+        new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
+        st.session_state.current_report_key = new_key
+        st.session_state.payment_new_key = new_key          # 供弹窗显示
+        st.session_state.payment_plan_name = plan_name
+        
+        # 尝试发送邮件
+        email_sent = False
+        email_error = None
+        if customer_email:
+            success, msg = send_license_email(customer_email, new_key, plan_name, max_uses, expiry_str[:10], lang=current_lang)
+            email_sent = success
+            email_error = msg if not success else None
+        st.session_state.payment_email_sent = email_sent
+        st.session_state.payment_email_error = email_error
+        
+        # 清除 URL 参数，避免重复触发
+        st.query_params.clear()
+        # 设置标志，显示支付成功弹窗
+        st.session_state.show_payment_dialog = True
+        st.rerun()
+    else:
+        st.error("❌ 支付失败或套餐无效，请联系客服。")
+        st.query_params.clear()
+
 # ================== 购买对话框 ==================
 @st.dialog("购买+解锁")
 def purchase_dialog():
