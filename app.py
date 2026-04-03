@@ -41,7 +41,7 @@ except:
 try:
     PERSISTENT_MODEL_NAME = st.secrets["AI_MODEL_NAME"]
 except:
-    PERSISTENT_MODEL_NAME = "deepseek-coder"   # 已切换为 deepseek-coder
+    PERSISTENT_MODEL_NAME = "deepseek-coder"
 
 # ================== 从 secrets 读取 SMTP 邮件配置 ==================
 try:
@@ -279,7 +279,6 @@ def add_security_css(disable=False):
                 transparent 42px, transparent 80px);
             background-size: 80px 80px;
         }
-        /* 让网页表格边框变为浅灰色 */
         table, th, td {
             border: 1px solid #CCCCCC !important;
             border-collapse: collapse;
@@ -320,7 +319,7 @@ def add_dynamic_watermark(lang, hide):
     </div>
     """, unsafe_allow_html=True)
 
-# ================== Word 表格生成（浅灰边框） ==================
+# ================== Word 表格生成 ==================
 def set_cell_border(cell, border_color=RGBColor(0xCC, 0xCC, 0xCC)):
     tc = cell._tc
     tcPr = tc.get_or_add_tcPr()
@@ -375,7 +374,6 @@ def markdown_to_docx(md_text, doc, lang):
                     table.style = 'Table Grid'
                     table.autofit = True
                     table.width = Inches(6.5)
-                    # 为所有单元格设置浅灰边框
                     for row in table.rows:
                         for cell in row.cells:
                             set_cell_border(cell, RGBColor(0xCC, 0xCC, 0xCC))
@@ -514,7 +512,7 @@ with col4:
         else:
             admin_login_dialog()
 
-# ================== 语言文本（强制完整输出 + 浅灰表格 + 网址） ==================
+# ================== 语言文本 ==================
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -904,7 +902,7 @@ t["trial_warning"] = t["trial_warning"].format(st.session_state.trial_uses_left)
 
 st.title(t["title"])
 
-# ================== 支付成功弹窗 ==================
+# ================== 支付成功弹窗（必须放在 st.title 之后，任何 UI 之前） ==================
 if st.session_state.get("show_payment_dialog", False):
     @st.dialog("✅ 支付成功")
     def payment_success_dialog():
@@ -928,6 +926,7 @@ if st.session_state.get("show_payment_dialog", False):
         
         st.markdown("---")
         if st.button("确定", use_container_width=True):
+            # 清除弹窗标志和临时数据
             st.session_state.show_payment_dialog = False
             for key in ["payment_new_key", "payment_plan_name", "payment_email_sent", "payment_email_error"]:
                 if key in st.session_state:
@@ -982,7 +981,7 @@ if "order_success" in params and "plan" in params:
     if uses > 0:
         new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
         st.session_state.current_report_key = new_key
-        st.session_state.payment_new_key = new_key          # 供弹窗显示
+        st.session_state.payment_new_key = new_key
         st.session_state.payment_plan_name = plan_name
         
         # 尝试发送邮件
@@ -1017,17 +1016,16 @@ def purchase_dialog():
 """)
     st.markdown("#### 🌍 国际支付（Stripe）")
     col1, col2, col3 = st.columns(3)
-    # 强制在当前标签页打开（target="_self"）
     with col1:
-        st.markdown('<a href="https://buy.stripe.com/test_9B67sL0Wh7298Nuaxk8og00" target="_self" style="background-color: #FF4B4B; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; width: 100%; text-align: center;">🎟️ Single Pass<br>$3</a>', unsafe_allow_html=True)
+        st.link_button("🎟️ Single Pass\n$3", "https://buy.stripe.com/test_9B67sL0Wh7298Nuaxk8og00")
     with col2:
-        st.markdown('<a href="https://buy.stripe.com/9B6cN5bAVcmt5Bi7l88og02" target="_self" style="background-color: #FF4B4B; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; width: 100%; text-align: center;">📦 100 Credits<br>$30</a>', unsafe_allow_html=True)
+        st.link_button("📦 100 Credits\n$30", "https://buy.stripe.com/9B6cN5bAVcmt5Bi7l88og02")
     with col3:
-        st.markdown('<a href="https://buy.stripe.com/9B67sL0Wh7298Nuaxk8og00" target="_self" style="background-color: #FF4B4B; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; width: 100%; text-align: center;">🚀 1200 Credits<br>$200</a>', unsafe_allow_html=True)
+        st.link_button("🚀 1200 Credits\n$200", "https://buy.stripe.com/9B67sL0Wh7298Nuaxk8og00")
     st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
     st.info("国内支付即将开放，敬请期待。")
     st.markdown("支付成功后会自动跳回本页面，授权码将自动填入并激活。")
-    st.info("⚠️ 请确保支付页面在当前标签页打开，不要在新窗口/标签页中支付，否则授权码将无法自动回到报告页面。")
+
 # ================== 侧边栏 ==================
 with st.sidebar:
     report_key_input = st.text_input(
@@ -1177,7 +1175,7 @@ if submitted:
                             model=st.session_state.ai_model_name,
                             messages=[{"role": "user", "content": prompt}],
                             temperature=0.7,
-                            max_tokens=8000  # 确保完整输出
+                            max_tokens=8000
                         )
                         report_content = response.choices[0].message.content
                         if lang == "zh":
