@@ -279,6 +279,14 @@ def add_security_css(disable=False):
                 transparent 42px, transparent 80px);
             background-size: 80px 80px;
         }
+        /* 让网页表格边框变为浅灰色 */
+        table, th, td {
+            border: 1px solid #CCCCCC !important;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 6px;
+        }
     </style>
     <div class="bg-watermark"></div>
     <script>
@@ -312,7 +320,19 @@ def add_dynamic_watermark(lang, hide):
     </div>
     """, unsafe_allow_html=True)
 
-# ================== Word 表格生成 ==================
+# ================== Word 表格生成（浅灰边框） ==================
+def set_cell_border(cell, border_color=RGBColor(0xCC, 0xCC, 0xCC)):
+    tc = cell._tc
+    tcPr = tc.get_or_add_tcPr()
+    for edge in ['top', 'left', 'bottom', 'right']:
+        tag = f'w:{edge}'
+        border = OxmlElement(tag)
+        border.set(qn('w:val'), 'single')
+        border.set(qn('w:sz'), '4')
+        border.set(qn('w:space'), '0')
+        border.set(qn('w:color'), f'{border_color}')
+        tcPr.append(border)
+
 def markdown_to_docx(md_text, doc, lang):
     lines = md_text.split('\n')
     i = 0
@@ -355,6 +375,10 @@ def markdown_to_docx(md_text, doc, lang):
                     table.style = 'Table Grid'
                     table.autofit = True
                     table.width = Inches(6.5)
+                    # 为所有单元格设置浅灰边框
+                    for row in table.rows:
+                        for cell in row.cells:
+                            set_cell_border(cell, RGBColor(0xCC, 0xCC, 0xCC))
                     for col_idx, cell_text in enumerate(headers):
                         cell = table.cell(0, col_idx)
                         cell.text = cell_text
@@ -490,7 +514,7 @@ with col4:
         else:
             admin_login_dialog()
 
-# ================== 语言文本（包含高质量 prompt） ==================
+# ================== 语言文本（强制完整输出 + 浅灰表格已在CSS和Word中处理） ==================
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -555,17 +579,11 @@ TEXTS = {
         "trial_ended": "试用次数已用完，请联系 nc.ku@hotmail.com 购买授权码",
         "no_license": "未输入授权码，当前为试用模式（剩余次数：{}）",
         "trial_warning": "⚠️ 您还有 {} 次试用机会，输入授权码可解锁无限使用和下载功能。",
-        # ================== 高质量 prompt（能生成类似附件报告的详细内容） ==================
+        # ================== 强制完整输出的 prompt（必须包含6.2和6.3） ==================
         "report_prompt": """
 你是一位资深产品分析师和研发顾问，拥有25年消费电子及智能硬件行业经验。请根据以下产品信息，生成一份专业的《产品可行性分析报告》。
 
-报告必须严格按照以下Markdown结构输出，并且**必须包含具体的数据、金额、百分比、评分和表格**，使报告具有实际参考价值。例如：
-- 在市场规模部分，给出具体年份的市场规模（如“2025年约320亿美元”）和增长率（如“年增长30%”）。
-- 在用户痛点部分，给出提及频率（高/中/低）和具体描述。
-- 在竞品分析部分，列出至少3个主要竞品，并给出他们的定价区间（如“$60-150”）。
-- 在销售预测部分，给出第一、二、三年的具体销售额范围（如“1.5M - 3.0M 美元”）。
-- 在投资回报部分，给出具体的研发投入、生产成本、毛利率等数字。
-- 所有表格都要填满真实、合理的行业数据。
+**重要：报告必须严格按照以下Markdown结构输出，并且必须包含第六部分的所有三个小节：6.1、6.2、6.3。不得省略任何小节。** 报告内容要具体、有洞察，数据基于行业常识合理推断，并给出具体数字（市场规模、增长率、定价、销售额等）。
 
 # 《产品可行性分析报告》
 ## {product_name}
@@ -683,7 +701,7 @@ TEXTS = {
 
 ---
 
-请直接输出报告内容，不要添加额外解释。对于用户未提供的信息，基于行业标准进行合理推断，并给出具体的数字。
+请直接输出报告内容，不要添加额外解释。对于用户未提供的信息，基于行业标准进行合理推断，并给出具体的数字。务必确保第六部分的 6.2 和 6.3 完整输出。
 """
     },
     "en": {
@@ -752,13 +770,7 @@ TEXTS = {
         "report_prompt": """
 You are a senior product analyst and R&D consultant with 25 years of experience in consumer electronics and smart hardware. Based on the following product information, generate a professional "Product Feasibility Analysis Report".
 
-The report must strictly follow the Markdown structure below and **must include specific data, amounts, percentages, scores, and tables** to provide practical value. For example:
-- In market size, provide specific year and amount (e.g., "$32B in 2025") and growth rate (e.g., "30% YoY").
-- In pain points, provide frequency (High/Medium/Low) and description.
-- In competitor analysis, list at least 3 main competitors with price ranges (e.g., "$60-150").
-- In sales forecast, provide specific revenue ranges for year 1,2,3 (e.g., "$1.5M - $3.0M").
-- In ROI, provide specific R&D cost, production cost, gross margin numbers.
-- Fill all tables with realistic, industry-based data.
+**Important: The report must strictly follow the Markdown structure below and MUST include all three subsections of Part 6: 6.1, 6.2, and 6.3. Do not omit any subsection.** The content should be specific, insightful, and based on industry common sense with concrete numbers (market size, growth rates, pricing, sales figures, etc.).
 
 # Product Feasibility Analysis Report
 ## {product_name}
@@ -876,7 +888,7 @@ The report must strictly follow the Markdown structure below and **must include 
 
 ---
 
-Output the report directly without additional explanation. For information not provided by the user, make reasonable inferences based on industry standards and provide specific numbers.
+Output the report directly without additional explanation. For information not provided by the user, make reasonable inferences based on industry standards and provide specific numbers. Ensure that Part 6 includes all three subsections 6.1, 6.2, and 6.3.
 """
     }
 }
@@ -1128,6 +1140,7 @@ if submitted:
                             model=st.session_state.ai_model_name,
                             messages=[{"role": "user", "content": prompt}],
                             temperature=0.7,
+                            max_tokens=4000  # 增加 token 限制，防止截断
                         )
                         report_content = response.choices[0].message.content
                         if lang == "zh":
