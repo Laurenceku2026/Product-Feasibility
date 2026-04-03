@@ -6,6 +6,7 @@ import re
 import secrets
 import string
 import time
+import stripe
 from io import BytesIO
 from docx import Document
 from docx.shared import Inches, RGBColor
@@ -37,6 +38,11 @@ try:
     PERSISTENT_MODEL_NAME = st.secrets["AI_MODEL_NAME"]
 except:
     PERSISTENT_MODEL_NAME = "deepseek-coder"
+# ================== Stripe 配置 ==================
+try:
+    stripe.api_key = st.secrets["STRIPE_SECRET_KEY"]
+except:
+    stripe.api_key = ""
 
 # ================== 授权类型定义 ==================
 LICENSE_TYPES = {
