@@ -41,7 +41,7 @@ except:
 try:
     PERSISTENT_MODEL_NAME = st.secrets["AI_MODEL_NAME"]
 except:
-    PERSISTENT_MODEL_NAME = "deepseek-chat"
+    PERSISTENT_MODEL_NAME = "deepseek-coder"   # 已切换为 deepseek-coder
 
 # ================== 从 secrets 读取 SMTP 邮件配置 ==================
 try:
@@ -514,7 +514,7 @@ with col4:
         else:
             admin_login_dialog()
 
-# ================== 语言文本（强制完整输出 + 浅灰表格已在CSS和Word中处理） ==================
+# ================== 语言文本（强制完整输出 + 浅灰表格 + 网址） ==================
 TEXTS = {
     "zh": {
         "title": "📊 产品可行性 - AI分析系统",
@@ -579,7 +579,7 @@ TEXTS = {
         "trial_ended": "试用次数已用完，请联系 nc.ku@hotmail.com 购买授权码",
         "no_license": "未输入授权码，当前为试用模式（剩余次数：{}）",
         "trial_warning": "⚠️ 您还有 {} 次试用机会，输入授权码可解锁无限使用和下载功能。",
-        # ================== 强制完整输出的 prompt（必须包含6.2和6.3） ==================
+        # ================== 修改后的 prompt：添加网址 ==================
         "report_prompt": """
 你是一位资深产品分析师和研发顾问，拥有25年消费电子及智能硬件行业经验。请根据以下产品信息，生成一份专业的《产品可行性分析报告》。
 
@@ -587,6 +587,8 @@ TEXTS = {
 
 # 《产品可行性分析报告》
 ## {product_name}
+
+**报告在线访问地址：https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/**
 
 ## 报告基本信息
 
@@ -767,6 +769,7 @@ TEXTS = {
         "trial_ended": "Trial credits used up, please contact nc.ku@hotmail.com to purchase a license",
         "no_license": "No Report Key entered. Trial mode (remaining credits: {})",
         "trial_warning": "⚠️ You have {} trial credits left. Enter a license key to unlock unlimited usage and download.",
+        # ================== 修改后的英文 prompt：添加网址 ==================
         "report_prompt": """
 You are a senior product analyst and R&D consultant with 25 years of experience in consumer electronics and smart hardware. Based on the following product information, generate a professional "Product Feasibility Analysis Report".
 
@@ -774,6 +777,8 @@ You are a senior product analyst and R&D consultant with 25 years of experience 
 
 # Product Feasibility Analysis Report
 ## {product_name}
+
+**Online report access: https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/**
 
 ## Report Basic Information
 
@@ -1140,7 +1145,7 @@ if submitted:
                             model=st.session_state.ai_model_name,
                             messages=[{"role": "user", "content": prompt}],
                             temperature=0.7,
-                            max_tokens=8000  # 增加 token 限制，防止截断
+                            max_tokens=8000  # 确保完整输出
                         )
                         report_content = response.choices[0].message.content
                         if lang == "zh":
