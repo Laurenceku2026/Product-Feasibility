@@ -975,7 +975,7 @@ if "order_success" in params and "plan" in params:
             months = 0
             plan_name = "Unknown"
     
-if uses > 0:
+    if uses > 0:
     new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
     st.session_state.current_report_key = new_key
     st.session_state.payment_new_key = new_key          # 供弹窗显示
