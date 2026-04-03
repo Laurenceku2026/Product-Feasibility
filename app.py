@@ -1140,7 +1140,7 @@ if submitted:
                             model=st.session_state.ai_model_name,
                             messages=[{"role": "user", "content": prompt}],
                             temperature=0.7,
-                            max_tokens=4000  # 增加 token 限制，防止截断
+                            max_tokens=8000  # 增加 token 限制，防止截断
                         )
                         report_content = response.choices[0].message.content
                         if lang == "zh":
