@@ -149,12 +149,12 @@ def is_premium_user(report_key):
         return valid
     return False
 
-def generate_report_key(license_type, custom_uses=None, custom_months=None):
-    while True:
-        random_str = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
-        new_key = f"{license_type.upper()}_{random_str}"
-        if new_key not in st.session_state.usage_db:
-            break
+def generate_report_key(license_type, custom_uses=None, custom_months=None, custom_key=None):
+    """
+    生成授权码。如果 custom_key 提供且非空，则检查唯一性后直接使用；否则随机生成。
+    返回 (new_key, max_uses, expiry_str, type_name)
+    """
+    # 确定使用次数和有效期
     if license_type == "custom":
         max_uses = custom_uses
         max_months = custom_months
@@ -164,8 +164,24 @@ def generate_report_key(license_type, custom_uses=None, custom_months=None):
         max_uses = lic_info["max_uses"]
         max_months = lic_info["max_months"]
         type_name = lic_info["name"]
+    
     expiry = datetime.now() + timedelta(days=max_months*30)
     expiry_str = expiry.isoformat()
+    
+    # 处理授权码
+    if custom_key and custom_key.strip():
+        new_key = custom_key.strip().upper()
+        if new_key in st.session_state.usage_db:
+            return None, 0, None, "授权码已存在，请使用其他值"
+    else:
+        # 随机生成唯一码
+        while True:
+            random_str = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+            new_key = f"{license_type.upper()}_{random_str}"
+            if new_key not in st.session_state.usage_db:
+                break
+    
+    # 保存
     st.session_state.usage_db[new_key] = {
         "type": license_type,
         "remaining": max_uses,
@@ -386,7 +402,12 @@ def admin_settings_dialog():
             custom_uses = st.number_input("使用次数", min_value=1, step=1, value=100)
         with col_c2:
             custom_months = st.number_input("有效期（月）", min_value=1, step=1, value=12)
+    
+    # 自定义授权码输入（可选）
+    custom_key_input = st.text_input("自定义授权码（可选，留空则自动生成）", placeholder="例如：VIP_2026_001")
+    
     if st.button("生成 Report Key"):
+        # 确定 license_type
         if key_type == "试用版":
             license_type = "trial"
         elif key_type == "一级用户":
@@ -399,10 +420,15 @@ def admin_settings_dialog():
             license_type = "level4"
         else:
             license_type = "custom"
-        new_key, max_uses, expiry_str, type_name = generate_report_key(license_type, custom_uses, custom_months)
-        st.success(f"已生成 {type_name} Report Key：")
-        st.code(new_key, language="text")
-        st.write(f"可使用次数：{max_uses} 次，有效期至：{expiry_str[:10]}")
+        
+        result = generate_report_key(license_type, custom_uses, custom_months, custom_key_input)
+        if result[0] is None:
+            st.error(result[3])  # 错误信息
+        else:
+            new_key, max_uses, expiry_str, type_name = result
+            st.success(f"已生成 {type_name} Report Key：")
+            st.code(new_key, language="text")
+            st.write(f"可使用次数：{max_uses} 次，有效期至：{expiry_str[:10]}")
     
     st.markdown("---")
     st.subheader("生成付费套餐授权码")
@@ -412,6 +438,7 @@ def admin_settings_dialog():
         st.markdown("18元 / 3美元")
         st.markdown("3次 · 无有效期")
         if st.button("生成单次通行码"):
+            # 这里也可以支持自定义，但为简化，仍使用随机生成
             new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=3, custom_months=9999)
             st.success(f"单次通行授权码：")
             st.code(new_key, language="text")
@@ -1171,7 +1198,7 @@ with st.sidebar:
     else:
         st.error(t["api_not_configured"])
     st.markdown("---")
-    st.markdown(t["contact_info"])  # 将联系信息移到侧边栏最底部
+    st.markdown(t["contact_info"])
 
 # ================== 主表单 ==================
 st.markdown(f"### {t['input_title']}")
@@ -1208,7 +1235,6 @@ with col2:
 st.markdown(f"#### {t['tech_capability']}")
 col3, col4 = st.columns(2)
 with col3:
-    # 技术能力改为文本输入框
     tech_experience = st.text_area(
         t["tech_experience_label"],
         placeholder=t["tech_experience_ph"],
@@ -1220,7 +1246,6 @@ with col4:
 st.markdown(f"#### {t['business_goals']}")
 col5, col6 = st.columns(2)
 with col5:
-    # 研发预算改为文本输入框
     estimated_budget = st.text_input(
         t["estimated_budget_label"],
         placeholder=t["estimated_budget_ph"]
