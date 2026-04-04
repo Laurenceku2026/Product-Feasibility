@@ -214,11 +214,6 @@ def add_security_css(disable=False):
         th, td {
             padding: 6px;
         }
-        /* 让支付按钮更突出 */
-        .stButton button {
-            font-weight: bold !important;
-            font-size: 18px !important;
-        }
     </style>
     <div class="bg-watermark"></div>
     <script>
@@ -513,7 +508,7 @@ TEXTS = {
         "no_license": "未输入授权码，当前为试用模式（剩余次数：{}）",
         "trial_warning": "⚠️ 您还有 {} 次试用机会，输入授权码可解锁无限使用和下载功能。",
         "payment_link_generated": "✅ 支付链接已生成，请点击下方按钮完成支付",
-        "payment_hint": "",   # 可以留空，因为提示已经在上面的 success 中包含了
+        "payment_hint": "",
         "report_prompt": """
 你是一位资深产品分析师和研发顾问，拥有25年消费电子及智能硬件行业经验。请根据以下产品信息，生成一份专业的《产品可行性分析报告》。
 
@@ -931,7 +926,7 @@ if "order_success" in params and "plan" in params:
         st.query_params.clear()
 
 # ================== 购买对话框 ==================
-@st.dialog("购买+解锁" if lang=="zh" else "Purchase + Unlock")
+@st.dialog("购买+解锁" if lang=="zh" else "Purchase + Unlock", width="large")
 def purchase_dialog():
     st.markdown("### 选择套餐" if lang=="zh" else "### Select Plan")
     st.markdown("""
@@ -978,9 +973,9 @@ def purchase_dialog():
                     customer_creation="always",
                 )
                 st.success(t["payment_link_generated"])
-                # 使用红色加粗按钮，占满整行
+                # 自定义更红的按钮
                 button_html = f'<a href="{checkout_session.url}" target="_blank" style="display: block; background-color: #E60000; color: white; font-weight: bold; font-size: 18px; padding: 12px; border-radius: 8px; text-align: center; text-decoration: none; width: 100%;">{t["goto_stripe_button"]}</a>'
-st.markdown(button_html, unsafe_allow_html=True)
+                st.markdown(button_html, unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}" if lang=="zh" else f"Failed to create checkout session: {e}")
     
@@ -1007,7 +1002,8 @@ st.markdown(button_html, unsafe_allow_html=True)
                     customer_creation="always",
                 )
                 st.success(t["payment_link_generated"])
-                st.link_button(t["goto_stripe_button"], checkout_session.url, use_container_width=True)
+                button_html = f'<a href="{checkout_session.url}" target="_blank" style="display: block; background-color: #E60000; color: white; font-weight: bold; font-size: 18px; padding: 12px; border-radius: 8px; text-align: center; text-decoration: none; width: 100%;">{t["goto_stripe_button"]}</a>'
+                st.markdown(button_html, unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}" if lang=="zh" else f"Failed to create checkout session: {e}")
     
@@ -1034,7 +1030,8 @@ st.markdown(button_html, unsafe_allow_html=True)
                     customer_creation="always",
                 )
                 st.success(t["payment_link_generated"])
-                st.link_button(t["goto_stripe_button"], checkout_session.url, use_container_width=True)
+                button_html = f'<a href="{checkout_session.url}" target="_blank" style="display: block; background-color: #E60000; color: white; font-weight: bold; font-size: 18px; padding: 12px; border-radius: 8px; text-align: center; text-decoration: none; width: 100%;">{t["goto_stripe_button"]}</a>'
+                st.markdown(button_html, unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}" if lang=="zh" else f"Failed to create checkout session: {e}")
     
