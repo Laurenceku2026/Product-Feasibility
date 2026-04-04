@@ -1,3 +1,367 @@
+import streamlit as st
+import openai
+import json
+import os
+import re
+import secrets
+import string
+import time
+import stripe
+import pandas as pd
+from io import BytesIO
+from docx import Document
+from docx.shared import Inches, RGBColor
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
+from datetime import datetime, timedelta
+
+# ================== 页面配置 ==================
+st.set_page_config(
+    page_title="Product Feasibility Analysis System",
+    page_icon="📊",
+    layout="wide"
+)
+
+# ================== 管理员凭证 ==================
+ADMIN_USERNAME = "Laurence_ku"
+ADMIN_PASSWORD = "Ku_product$2026"
+
+# ================== 从 secrets 读取永久 API 配置 ==================
+try:
+    PERSISTENT_API_KEY = st.secrets["AI_API_KEY"]
+except:
+    PERSISTENT_API_KEY = ""
+try:
+    PERSISTENT_BASE_URL = st.secrets["AI_BASE_URL"]
+except:
+    PERSISTENT_BASE_URL = "https://api.deepseek.com"
+try:
+    PERSISTENT_MODEL_NAME = st.secrets["AI_MODEL_NAME"]
+except:
+    PERSISTENT_MODEL_NAME = "deepseek-coder"
+
+# ================== Stripe 配置 ==================
+try:
+    stripe.api_key = st.secrets["STRIPE_SECRET_KEY"]
+except:
+    stripe.api_key = ""
+
+# ================== 授权类型定义 ==================
+LICENSE_TYPES = {
+    "trial": {"name": "试用版", "max_uses": 60, "max_months": 3, "en_name": "Trial"},
+    "level1": {"name": "一级用户", "max_uses": 100, "max_months": 12, "en_name": "Level 1"},
+    "level2": {"name": "二级用户", "max_uses": 300, "max_months": 24, "en_name": "Level 2"},
+    "level3": {"name": "三级用户", "max_uses": 500, "max_months": 36, "en_name": "Level 3"},
+    "level4": {"name": "四级用户", "max_uses": 1000, "max_months": 60, "en_name": "Level 4"},
+}
+
+USAGE_FILE = "usage_data.json"
+
+def load_usage_data():
+    if os.path.exists(USAGE_FILE):
+        try:
+            with open(USAGE_FILE, "r") as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_usage_data(data):
+    with open(USAGE_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+# ================== 初始化 session state ==================
+if "lang" not in st.session_state:
+    st.session_state.lang = "zh"
+if "pulse_active" not in st.session_state:
+    st.session_state.pulse_active = False
+if "report_content_zh" not in st.session_state:
+    st.session_state.report_content_zh = None
+if "report_content_en" not in st.session_state:
+    st.session_state.report_content_en = None
+if "admin_logged_in" not in st.session_state:
+    st.session_state.admin_logged_in = False
+if "ai_api_key" not in st.session_state:
+    st.session_state.ai_api_key = PERSISTENT_API_KEY
+if "ai_base_url" not in st.session_state:
+    st.session_state.ai_base_url = PERSISTENT_BASE_URL
+if "ai_model_name" not in st.session_state:
+    st.session_state.ai_model_name = PERSISTENT_MODEL_NAME
+if "usage_db" not in st.session_state:
+    st.session_state.usage_db = load_usage_data()
+if "current_report_key" not in st.session_state:
+    st.session_state.current_report_key = ""
+if "current_license_type" not in st.session_state:
+    st.session_state.current_license_type = None
+if "trial_uses_left" not in st.session_state:
+    st.session_state.trial_uses_left = 3
+
+def activate_license(report_key):
+    if report_key in st.session_state.usage_db:
+        record = st.session_state.usage_db[report_key]
+        remaining = record["remaining"]
+        expiry_str = record["expiry"]
+        expiry = datetime.fromisoformat(expiry_str)
+        if remaining > 0 and datetime.now() <= expiry:
+            lic_type = record.get("type", "unknown")
+            st.session_state.current_license_type = lic_type
+            return True, remaining, expiry_str, lic_type
+        else:
+            st.session_state.current_license_type = None
+            return False, 0, None, None
+    else:
+        st.session_state.current_license_type = None
+        return False, 0, None, None
+
+def consume_usage(report_key):
+    if st.session_state.admin_logged_in:
+        return True
+    if not report_key:
+        if st.session_state.trial_uses_left > 0:
+            st.session_state.trial_uses_left -= 1
+            return True
+        else:
+            return False
+    valid, remaining, expiry_str, _ = activate_license(report_key)
+    if not valid:
+        return False
+    record = st.session_state.usage_db[report_key]
+    record["remaining"] -= 1
+    record["total_uses"] = record.get("total_uses", 0) + 1
+    save_usage_data(st.session_state.usage_db)
+    return True
+
+def get_remaining_info(report_key):
+    if st.session_state.admin_logged_in:
+        return "无限", "永久"
+    if report_key:
+        valid, remaining, expiry_str, _ = activate_license(report_key)
+        if valid:
+            expiry = datetime.fromisoformat(expiry_str)
+            return str(remaining), expiry.strftime("%Y-%m-%d")
+    return str(st.session_state.trial_uses_left), "试用剩余次数"
+
+def is_premium_user(report_key):
+    if st.session_state.admin_logged_in:
+        return True
+    if report_key:
+        valid, _, _, _ = activate_license(report_key)
+        return valid
+    return False
+
+def generate_report_key(license_type, custom_uses=None, custom_months=None):
+    while True:
+        random_str = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+        new_key = f"{license_type.upper()}_{random_str}"
+        if new_key not in st.session_state.usage_db:
+            break
+    if license_type == "custom":
+        max_uses = custom_uses
+        max_months = custom_months
+        type_name = "自定义"
+    else:
+        lic_info = LICENSE_TYPES[license_type]
+        max_uses = lic_info["max_uses"]
+        max_months = lic_info["max_months"]
+        type_name = lic_info["name"]
+    expiry = datetime.now() + timedelta(days=max_months*30)
+    expiry_str = expiry.isoformat()
+    st.session_state.usage_db[new_key] = {
+        "type": license_type,
+        "remaining": max_uses,
+        "expiry": expiry_str,
+        "total_uses": 0,
+        "generated_at": datetime.now().isoformat()
+    }
+    save_usage_data(st.session_state.usage_db)
+    return new_key, max_uses, expiry_str, type_name
+
+# ================== 防复制/截屏 CSS + 动态水印 ==================
+def add_security_css(disable=False):
+    if disable:
+        return
+    st.markdown("""
+    <style>
+        body, .stApp, .markdown-text-container, .report-container {
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+        body {
+            -webkit-touch-callout: none;
+            pointer-events: auto;
+        }
+        .bg-watermark {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.05;
+            pointer-events: none;
+            z-index: 999;
+            background-image: repeating-linear-gradient(45deg, 
+                #000 0px, #000 2px, 
+                transparent 2px, transparent 40px,
+                #000 40px, #000 42px,
+                transparent 42px, transparent 80px);
+            background-size: 80px 80px;
+        }
+        table, th, td {
+            border: 1px solid #CCCCCC !important;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 6px;
+        }
+        /* 侧边栏购买按钮红色加粗突出 */
+        div[data-testid="stSidebar"] .stButton button {
+            background-color: #E60000 !important;
+            color: white !important;
+            font-weight: bold !important;
+            font-size: 18px !important;
+            border: none !important;
+            padding: 0.5rem 1rem !important;
+            width: 100% !important;
+        }
+        div[data-testid="stSidebar"] .stButton button:hover {
+            background-color: #B30000 !important;
+            color: white !important;
+        }
+        .stButton button {
+            font-weight: bold !important;
+        }
+    </style>
+    <div class="bg-watermark"></div>
+    <script>
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            return false;
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && (e.key === 'c' || e.key === 'C' || e.key === 'v' || e.key === 'V' || e.key === 'x' || e.key === 'X' || e.key === 's' || e.key === 'S')) {
+                e.preventDefault();
+                return false;
+            }
+            if (e.key === 'F12') {
+                e.preventDefault();
+                return false;
+            }
+        });
+    </script>
+    """, unsafe_allow_html=True)
+
+def add_dynamic_watermark(lang, hide):
+    if hide:
+        return
+    if lang == "zh":
+        watermark_text = "机密，样板报告，请联系 Techlife2027@gmail.com"
+    else:
+        watermark_text = "Confidential, Sample Report, Pls contact Techlife2027@gmail.com"
+    st.markdown(f"""
+    <div style="position: fixed; bottom: 20px; right: 20px; opacity: 0.4; font-size: 14px; color: #666; pointer-events: none; z-index: 1000; font-family: sans-serif; background: rgba(255,255,255,0.5); padding: 4px 8px; border-radius: 4px;">
+        {watermark_text}
+    </div>
+    """, unsafe_allow_html=True)
+
+# ================== Word 表格生成（浅灰边框） ==================
+def set_cell_border(cell, border_color=RGBColor(0xCC, 0xCC, 0xCC)):
+    tc = cell._tc
+    tcPr = tc.get_or_add_tcPr()
+    for edge in ['top', 'left', 'bottom', 'right']:
+        tag = f'w:{edge}'
+        border = OxmlElement(tag)
+        border.set(qn('w:val'), 'single')
+        border.set(qn('w:sz'), '4')
+        border.set(qn('w:space'), '0')
+        border.set(qn('w:color'), f'{border_color}')
+        tcPr.append(border)
+
+def markdown_to_docx(md_text, doc, lang):
+    lines = md_text.split('\n')
+    i = 0
+    font_name = 'Arial' if lang == 'en' else '宋体'
+    while i < len(lines):
+        line = lines[i]
+        if line.startswith('# '):
+            doc.add_heading(line[2:], level=1)
+            i += 1
+            continue
+        if line.startswith('## '):
+            doc.add_heading(line[3:], level=2)
+            i += 1
+            continue
+        if line.startswith('### '):
+            doc.add_heading(line[4:], level=3)
+            i += 1
+            continue
+        if line.startswith('|') and i+1 < len(lines):
+            table_lines = []
+            while i < len(lines) and lines[i].startswith('|'):
+                table_lines.append(lines[i].strip())
+                i += 1
+            if len(table_lines) >= 2:
+                def parse_row(row):
+                    cells = [cell.strip() for cell in row.split('|')]
+                    if cells and cells[0] == '':
+                        cells = cells[1:]
+                    if cells and cells[-1] == '':
+                        cells = cells[:-1]
+                    return cells
+                headers = parse_row(table_lines[0])
+                if len(table_lines) > 1 and '---' in table_lines[1]:
+                    data_lines = table_lines[2:] if len(table_lines) > 2 else []
+                else:
+                    data_lines = table_lines[1:]
+                num_cols = len(headers)
+                if num_cols > 0:
+                    table = doc.add_table(rows=1+len(data_lines), cols=num_cols)
+                    table.style = 'Table Grid'
+                    table.autofit = True
+                    table.width = Inches(6.5)
+                    for row in table.rows:
+                        for cell in row.cells:
+                            set_cell_border(cell, RGBColor(0xCC, 0xCC, 0xCC))
+                    for col_idx, cell_text in enumerate(headers):
+                        cell = table.cell(0, col_idx)
+                        cell.text = cell_text
+                        for paragraph in cell.paragraphs:
+                            for run in paragraph.runs:
+                                run.font.bold = True
+                                run.font.name = font_name
+                    for row_idx, data_line in enumerate(data_lines):
+                        cells = parse_row(data_line)
+                        for col_idx, cell_text in enumerate(cells):
+                            if col_idx < num_cols:
+                                cell = table.cell(row_idx+1, col_idx)
+                                cell.text = cell_text
+                                for paragraph in cell.paragraphs:
+                                    for run in paragraph.runs:
+                                        run.font.name = font_name
+                    doc.add_paragraph()
+            continue
+        if line.strip():
+            p = doc.add_paragraph(line)
+            for run in p.runs:
+                run.font.name = font_name
+        else:
+            doc.add_paragraph()
+        i += 1
+
+# ================== 管理员对话框 ==================
+@st.dialog("管理员登录")
+def admin_login_dialog():
+    username = st.text_input("用户名")
+    password = st.text_input("密码", type="password")
+    if st.button("登录"):
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            st.session_state.admin_logged_in = True
+            st.success("登录成功！")
+            st.rerun()
+        else:
+            st.error("用户名或密码错误")
+
 @st.dialog("管理员设置")
 def admin_settings_dialog():
     st.subheader("AI API 配置（临时覆盖）")
@@ -77,7 +441,6 @@ def admin_settings_dialog():
     # 从 usage_db 中提取数据，按生成时间倒序排序
     records = []
     for key, data in st.session_state.usage_db.items():
-        # 兼容旧记录（可能没有 generated_at）
         gen_time = data.get("generated_at")
         if gen_time:
             try:
@@ -94,10 +457,8 @@ def admin_settings_dialog():
             "有效期至": data["expiry"][:10] if data["expiry"] else "永久",
             "生成时间": gen_dt.strftime("%Y-%m-%d %H:%M:%S") if gen_dt != datetime.min else "未知"
         })
-    # 按生成时间倒序排序（最新的在前）
     records.sort(key=lambda x: x["生成时间"], reverse=True)
     
-    # 选择显示条数
     show_limit = st.selectbox("显示条数", ["最近10条", "最近20条", "最近50条", "全部"], index=0)
     if show_limit == "最近10条":
         limit = 10
@@ -109,15 +470,12 @@ def admin_settings_dialog():
         limit = len(records)
     
     display_records = records[:limit]
-    
-    # 显示表格
     if display_records:
         df = pd.DataFrame(display_records)
         st.dataframe(df, use_container_width=True)
     else:
         st.info("暂无授权码记录")
     
-    # 导出 Excel（所有记录，不限于显示条数）
     if st.button("📥 导出所有授权码为 Excel"):
         if records:
             df_all = pd.DataFrame(records)
@@ -137,3 +495,827 @@ def admin_settings_dialog():
     st.markdown("---")
     st.subheader("永久修改 API Key")
     st.markdown("请前往 [Streamlit Cloud Secrets](https://share.streamlit.io/) 修改 `AI_API_KEY`、`AI_BASE_URL` 和 `AI_MODEL_NAME`，然后重启应用。")
+
+# ================== 右上角按钮 ==================
+col1, col2, col3, col4 = st.columns([8, 1, 1, 1])
+with col2:
+    if st.button("中文", key="zh_btn", type="primary"):
+        st.session_state.lang = "zh"
+        st.rerun()
+with col3:
+    if st.button("English", key="en_btn", type="primary"):
+        st.session_state.lang = "en"
+        st.rerun()
+with col4:
+    if st.button("⚙️", key="settings_btn"):
+        if st.session_state.admin_logged_in:
+            admin_settings_dialog()
+        else:
+            admin_login_dialog()
+
+# ================== 语言文本 ==================
+TEXTS = {
+    "zh": {
+        "title": "📊 产品可行性 - AI分析系统",
+        "sidebar_title": "关于分析系统",
+        "sidebar_basis": "本系统基于：",
+        "basis_items": ["25+年研发管理经验", "AI大模型数据分析", "行业数据库与竞品追踪", "DFSS/六西格玛方法论"],
+        "analyst_name_label": "分析人姓名",
+        "analyst_name_ph": "请输入您的姓名或分析师姓名",
+        "analyst_title_label": "分析人头衔（可选）",
+        "analyst_title_ph": "例如：研发总监、技术顾问",
+        "api_status": "AI API 状态",
+        "api_configured": "✅ 已配置",
+        "api_not_configured": "❌ 未配置，请联系管理员",
+        "report_key_label": "授权码 (Report Key)",
+        "report_key_help": "输入授权码可获得完整权限",
+        "license_info": "授权信息",
+        "remaining_label": "剩余次数",
+        "expiry_label": "有效期至",
+        "contact_info": "📞 **联系：**  \n✉️ 电邮: Techlife2027@gmail.com",
+        "purchase_title": "💰 购买+解锁",
+        "purchase_button": "💰 购买授权码",
+        "goto_stripe_button": "前往 Stripe 支付页面",
+        "input_title": "📝 产品信息输入",
+        "basic_info": "基本信息",
+        "product_name": "产品名称",
+        "product_name_ph": "例如：宠物智能饮水机",
+        "product_desc": "产品简要描述",
+        "product_desc_ph": "例如：一款支持APP控制、可记录饮水量的智能宠物饮水机",
+        "target_markets": "目标市场",
+        "market_options": ["中国大陆", "美国", "欧洲", "东南亚", "日本", "其他"],
+        "target_users": "目标用户群体",
+        "target_users_ph": "例如：25-40岁城市中产、养猫人群",
+        "market_channel": "市场与渠道",
+        "channel_status": "现有渠道情况",
+        "channel_options": ["有成熟渠道", "有部分渠道", "渠道较弱", "无渠道/从零开始"],
+        "channel_detail": "渠道详情",
+        "channel_detail_ph": "例如：天猫旗舰店、京东自营、部分线下宠物店",
+        "brand_status": "品牌认知度",
+        "brand_options": ["高（知名品牌）", "中（行业内有认知）", "低（需要建立品牌）"],
+        "tech_capability": "技术能力",
+        "tech_experience": "相关技术经验",
+        "tech_options": ["智能硬件/物联网", "APP开发", "机械结构设计", "光学设计", "电子电路", "供应链管理", "海外认证（UL/CE/FCC）", "DFSS/六西格玛"],
+        "dev_stage": "产品开发阶段",
+        "stage_options": ["概念/想法", "调研中", "已立项", "开发中", "已有样机"],
+        "business_goals": "商业目标",
+        "estimated_budget": "预估研发预算",
+        "budget_options": ["50万以下", "50-100万", "100-200万", "200-500万", "500万以上"],
+        "sales_target": "首年销售目标",
+        "sales_target_ph": "例如：1000万人民币 / 200万美元",
+        "other_info": "其他信息",
+        "other_ph": "任何你认为重要的信息，如：已有技术储备、合作伙伴、特殊要求等",
+        "submit_btn": "🚀 开始分析",
+        "product_name_missing": "请填写产品名称",
+        "api_key_missing": "AI API Key 未配置，请联系管理员",
+        "generating": "报告生成中，大概需要3~5分钟，请稍候...",
+        "error_prefix": "报告生成失败：",
+        "report_title": "📄 生成的可行性分析报告",
+        "download_section": "📥 下载报告",
+        "download_btn": "下载 Word 文档",
+        "download_unlock_btn": "📥 下载报告+解锁",
+        "key_error": "授权码无效或已过期",
+        "back_btn": "← 返回重新填写",
+        "footer": "© 2026 Laurence Ku | AI产品可行性分析系统 | 基于25年研发管理经验",
+        "trial_ended": "试用次数已用完，请联系 Techlife2027@gmail.com 购买授权码",
+        "no_license": "未输入授权码，当前为试用模式（剩余次数：{}）",
+        "trial_warning": "⚠️ 您还有 {} 次试用机会，输入授权码可解锁无限使用和下载功能。",
+        "payment_link_generated": "✅ 支付链接已生成，请点击下方按钮完成支付",
+        "payment_hint": "",
+        "report_prompt": """
+你是一位资深产品分析师和研发顾问，拥有25年消费电子及智能硬件行业经验。请根据以下产品信息，生成一份专业的《产品可行性分析报告》。
+
+**重要要求：**
+1. 报告必须严格按照以下Markdown结构输出，并且必须包含第六部分的所有三个小节：6.1、6.2、6.3。
+2. 对于用户选择的每一个目标市场（例如中国大陆、美国等），都需要分别进行市场规模与趋势、用户画像、竞品分析、渠道结构的分析。**不能只笼统地写一个综合表格，而是按市场分别列出**。
+3. 用户痛点分析必须基于真实场景，并**从痛点中提炼出具体的技术参数要求**（例如：从“清洗困难”提炼出“易拆洗、无死角、可洗碗机清洗”等具体设计指标）。
+4. 竞品分析要针对每个目标市场列出该市场的主要竞品（至少3个），并对比功能、定价、优势劣势。
+5. 技术可行性评估中的“关键技术要求”必须与前面提炼的用户痛点直接关联，明确写出对应的技术指标（如噪音≤30dB、出粮精度误差<5%、材质为食品级不锈钢等）。
+6. 所有表格必须包含具体数据（金额、百分比、评分等），不得留空或仅写“待补充”。
+
+# 《产品可行性分析报告》
+## {product_name}
+
+**报告在线访问地址：https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/**
+
+## 报告基本信息
+
+| 项目 | 内容 |
+|------|------|
+| 产品名称 | {product_name} |
+| 产品描述 | {product_description} |
+| 目标市场 | {target_markets} |
+| 目标用户 | {target_users} |
+| 报告日期 | {{CURRENT_DATE}} |
+| 分析人 | {{ANALYST_INFO}} |
+
+---
+
+## 第一部分：市场需求分析
+
+### 1.1 市场规模与趋势
+
+**请按每个目标市场分别列出**，每个市场单独一个表格或一个子章节。表格需包含：市场规模（具体年份和金额）、年增长率、主要驱动因素、主要瓶颈。
+
+### 1.2 用户画像
+
+**请按每个目标市场分别描述**核心用户特征：年龄、性别、收入、宠物类型、购买动机、价格敏感度、信息获取渠道等。可用表格或分点列出。
+
+### 1.3 用户痛点分析
+
+**请按每个目标市场分别列出3-5个核心痛点**，用表格说明：痛点、提及频率（高/中/低）、具体描述。**并且在每个痛点后，直接提炼出对应的技术参数要求**（例如：痛点“饮水机清洗困难”→ 技术参数要求：“结构可完全拆卸、无清洁死角、支持洗碗机清洗”）。
+
+### 1.4 关键功能需求排序
+
+基于上述痛点，列出跨市场通用的关键功能需求，用表格给出功能、重要性评分（1-10分）、说明。
+
+---
+
+## 第二部分：竞品分析
+
+### 2.1 主要竞争对手
+
+**请按每个目标市场分别列出至少3个主要竞品**，用表格说明：品牌、产品型号/系列、优势、劣势、定价区间。
+
+### 2.2 竞品功能对比
+
+**请按每个目标市场分别选择5-6个关键功能进行对比**，用表格展示：功能、竞品A表现、竞品B表现、竞品C表现、市场空白机会。
+
+### 2.3 市场空白点分析
+
+综合所有市场，列出至少3个跨市场的空白机会，每个机会给出简要说明。
+
+---
+
+## 第三部分：渠道适配性分析
+
+### 3.1 目标市场渠道结构
+
+**请按每个目标市场分别描述**主要渠道类型、占比、特点、适合度，用表格形式。
+
+### 3.2 客户现有渠道现状
+
+（基于用户输入：渠道情况={channel_status}，渠道详情={channel_detail}，品牌认知度={brand_status}，进行分析，说明优势和不足）
+
+### 3.3 渠道策略建议
+
+按年份给出渠道拓展建议，用表格：阶段、市场、渠道策略、具体行动。
+
+---
+
+## 第四部分：技术可行性评估
+
+### 4.1 关键技术要求
+
+**必须与第一部分提炼的用户痛点直接挂钩**，用表格列出：关键技术项、对应的痛点、具体技术要求（含量化指标）、客户现有能力、风险评估（高/中/低）。例如：痛点“清洗困难” → 技术项“模块化快拆结构” → 要求“拆解步骤≤3步，可进洗碗机”。
+
+### 4.2 开发周期估算
+
+用表格列出：阶段、时间、关键任务。
+
+### 4.3 关键风险点
+
+用表格列出：风险、可能性（高/中/低）、影响（高/中/低）、应对措施。
+
+---
+
+## 第五部分：销售预测
+
+### 5.1 预测模型假设
+
+列出定价、目标市场、市场份额等假设，用要点形式。
+
+### 5.2 销售额预测
+
+3年预测，用表格：年份、美国市场、中国市场、总营收、关键假设。
+
+### 5.3 投资回报估算
+
+用表格列出：研发投入、市场推广、首批生产成本、总启动资金、毛利率、盈亏平衡点。
+
+---
+
+## 第六部分：结论与建议
+
+### 6.1 综合评估
+
+用表格打分：市场吸引力、技术可行性、渠道匹配度、竞争格局、投资回报，各1-10分，并说明理由。
+
+### 6.2 差异化定位建议
+
+给出2-3个定位选项，用表格分析：定位、优势、风险。
+
+### 6.3 最终建议
+
+给出综合评分（例如X/10分）和“建议/不建议/积极进入”的结论，以及5点具体的下一步行动。
+
+---
+
+请直接输出报告内容，不要添加额外解释。对于用户未提供的信息，基于行业标准进行合理推断，并给出具体的数字。务必确保第六部分的 6.2 和 6.3 完整输出。
+"""
+    },
+    "en": {
+        "title": "📊 Product Feasibility - AI Analysis System",
+        "sidebar_title": "About the System",
+        "sidebar_basis": "This system is based on:",
+        "basis_items": ["25+ years R&D management", "AI big data analysis", "Industry database & competitor tracking", "DFSS/Six Sigma methodology"],
+        "analyst_name_label": "Analyst Name",
+        "analyst_name_ph": "Enter your name or analyst name",
+        "analyst_title_label": "Analyst Title (Optional)",
+        "analyst_title_ph": "e.g., R&D Director, Technical Consultant",
+        "api_status": "AI API Status",
+        "api_configured": "✅ Configured",
+        "api_not_configured": "❌ Not configured, contact admin",
+        "report_key_label": "Report Key",
+        "report_key_help": "Enter the license key to get full access",
+        "license_info": "License Info",
+        "remaining_label": "Remaining uses",
+        "expiry_label": "Valid until",
+        "contact_info": "📞 **Contact: Laurence**  \n✉️ Email: Techlife2027@gmail.com",
+        "purchase_title": "💰 Purchase + Unlock",
+        "purchase_button": "💰 Purchase License",
+        "goto_stripe_button": "Go to Stripe Payment Page",
+        "input_title": "📝 Product Information Input",
+        "basic_info": "Basic Information",
+        "product_name": "Product Name",
+        "product_name_ph": "e.g., Smart Pet Water Fountain",
+        "product_desc": "Brief Description",
+        "product_desc_ph": "e.g., A smart pet fountain with APP control and water intake logging",
+        "target_markets": "Target Markets",
+        "market_options": ["Mainland China", "United States", "Europe", "Southeast Asia", "Japan", "Others"],
+        "target_users": "Target User Group",
+        "target_users_ph": "e.g., Urban middle-class cat owners aged 25-40",
+        "market_channel": "Market & Channel",
+        "channel_status": "Current Channel Status",
+        "channel_options": ["Mature channels", "Partial channels", "Weak channels", "No channels / start from scratch"],
+        "channel_detail": "Channel Details",
+        "channel_detail_ph": "e.g., Tmall flagship store, JD self-operated, some offline pet stores",
+        "brand_status": "Brand Awareness",
+        "brand_options": ["High (well-known)", "Medium (recognized in industry)", "Low (need to build brand)"],
+        "tech_capability": "Technical Capability",
+        "tech_experience": "Relevant Tech Experience",
+        "tech_options": ["Smart Hardware/IoT", "App Development", "Mechanical Design", "Optical Design", "Electronic Circuits", "Supply Chain Management", "Overseas Certification (UL/CE/FCC)", "DFSS/Six Sigma"],
+        "dev_stage": "Development Stage",
+        "stage_options": ["Idea/Concept", "Researching", "Project approved", "Developing", "Prototype ready"],
+        "business_goals": "Business Goals",
+        "estimated_budget": "Estimated R&D Budget",
+        "budget_options": ["Under 500k", "500k-1M", "1M-2M", "2M-5M", "Above 5M"],
+        "sales_target": "First Year Sales Target",
+        "sales_target_ph": "e.g., 10M RMB / 2M USD",
+        "other_info": "Other Information",
+        "other_ph": "Any important info, e.g., existing tech stack, partners, special requirements",
+        "submit_btn": "🚀 Start Analysis",
+        "product_name_missing": "Please enter the product name",
+        "api_key_missing": "AI API Key not configured, contact admin",
+        "generating": "Generating report in 3~5 minutes, please wait...",
+        "error_prefix": "Report generation failed: ",
+        "report_title": "📄 Generated Feasibility Analysis Report",
+        "download_section": "📥 Download Report",
+        "download_btn": "Download Word Document",
+        "download_unlock_btn": "📥 Download Report + Unlock",
+        "key_error": "Invalid or expired Report Key",
+        "back_btn": "← Back to re-enter",
+        "footer": "© 2026 Laurence Ku | AI Product Feasibility System | Based on 25+ years R&D experience",
+        "trial_ended": "Trial credits used up, please contact Techlife2027@gmail.com to purchase a license",
+        "no_license": "No Report Key entered. Trial mode (remaining credits: {})",
+        "trial_warning": "⚠️ You have {} trial credits left. Enter a license key to unlock unlimited usage and download.",
+        "payment_link_generated": "✅ Payment link generated. Click the button below to pay.",
+        "payment_hint": "",
+        "report_prompt": """
+You are a senior product analyst and R&D consultant with 25 years of experience in consumer electronics and smart hardware. Based on the following product information, generate a professional "Product Feasibility Analysis Report".
+
+**Important Requirements:**
+1. The report must strictly follow the Markdown structure below and MUST include all three subsections of Part 6: 6.1, 6.2, and 6.3.
+2. For each target market selected by the user (e.g., Mainland China, USA), you must provide separate analysis for market size & trends, user persona, competitor analysis, and channel structure. **Do not write a single combined table; break down by market**.
+3. User pain points must be based on real scenarios, and **from each pain point, derive specific technical parameter requirements** (e.g., pain point "difficult to clean" → technical requirement "fully detachable structure, no dead corners, dishwasher-safe").
+4. Competitor analysis must list at least 3 main competitors per target market, comparing features, pricing, strengths, and weaknesses.
+5. The "Key Technical Requirements" in Part 4 must be directly linked to the pain points identified earlier, specifying quantitative metrics (e.g., noise ≤30dB, feeding accuracy error <5%, food-grade stainless steel).
+6. All tables must contain concrete data (amounts, percentages, scores, etc.) – never leave cells empty or write "to be added".
+
+# Product Feasibility Analysis Report
+## {product_name}
+
+**Online report access: https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/**
+
+## Report Basic Information
+
+| Item | Content |
+|------|---------|
+| Product Name | {product_name} |
+| Product Description | {product_description} |
+| Target Markets | {target_markets} |
+| Target Users | {target_users} |
+| Report Date | {{CURRENT_DATE}} |
+| Analyst | {{ANALYST_INFO}} |
+
+---
+
+## Part 1: Market Demand Analysis
+
+### 1.1 Market Size & Trends
+
+**Provide separate analysis for each target market.** Each market should have its own table or subsection including: market size (year and amount), growth rate, key drivers, key barriers.
+
+### 1.2 User Persona
+
+**Describe user persona separately for each target market** – age, gender, income, pet type, purchase motivation, price sensitivity, info channels. Use tables or bullet points.
+
+### 1.3 User Pain Points
+
+**List 3-5 core pain points per target market** in a table: pain point, frequency (High/Medium/Low), description. **After each pain point, derive corresponding technical parameter requirements** (e.g., pain point "hard to clean" → technical requirement "fully removable parts, dishwasher-safe, no dead corners").
+
+### 1.4 Key Feature Priority
+
+Based on the pain points above, list cross-market key features with importance score (1-10) and explanation in a table.
+
+---
+
+## Part 2: Competitive Analysis
+
+### 2.1 Main Competitors
+
+**List at least 3 main competitors per target market** in a table: brand, product/model, strengths, weaknesses, price range.
+
+### 2.2 Feature Comparison
+
+**For each target market, compare 5-6 key features** in a table: feature, competitor A, competitor B, competitor C, gap opportunity.
+
+### 2.3 Market Gap Summary
+
+List at least 3 cross-market gap opportunities with brief explanation.
+
+---
+
+## Part 3: Channel Suitability Analysis
+
+### 3.1 Target Market Channel Structure
+
+**Describe channel types, share, characteristics, suitability separately for each target market** in a table.
+
+### 3.2 Client's Current Channel Status
+
+(Analyze based on user input: channel status={channel_status}, channel details={channel_detail}, brand awareness={brand_status})
+
+### 3.3 Channel Strategy Recommendations
+
+Provide channel expansion recommendations by year in a table: phase, market, channel strategy, specific actions.
+
+---
+
+## Part 4: Technical Feasibility Assessment
+
+### 4.1 Key Technical Requirements
+
+**Must directly map to pain points from Part 1.** Use a table with: technology item, corresponding pain point, specific technical requirement (quantified), client capability, risk level (High/Medium/Low). Example: pain point "hard to clean" → technology "modular quick-release" → requirement "≤3 steps to disassemble, dishwasher-safe".
+
+### 4.2 Development Timeline Estimate
+
+List phase, duration, key tasks in a table.
+
+### 4.3 Key Risk Points
+
+List risk, probability (High/Medium/Low), impact (High/Medium/Low), mitigation in a table.
+
+---
+
+## Part 5: Sales Forecast
+
+### 5.1 Forecast Assumptions
+
+List pricing, target market, share assumptions in bullet points.
+
+### 5.2 Sales Forecast
+
+3-year forecast in a table: year, US market, China market, total revenue, key assumptions.
+
+### 5.3 ROI Estimate
+
+List R&D investment, marketing, first production cost, total capital, gross margin, breakeven point in a table.
+
+---
+
+## Part 6: Conclusion & Recommendations
+
+### 6.1 Comprehensive Evaluation
+
+Score each dimension: Market Attractiveness, Technical Feasibility, Channel Fit, Competitive Landscape, ROI Potential out of 10, with explanation in a table.
+
+### 6.2 Differentiation Positioning Recommendations
+
+Provide 2-3 positioning options in a table: positioning, advantages, risks.
+
+### 6.3 Final Recommendation
+
+Provide overall score (e.g., X/10) and a conclusion like "Recommended / Highly Recommended / Not Recommended", plus 5 specific next steps.
+
+---
+
+Output the report directly without additional explanation. For information not provided by the user, make reasonable inferences based on industry standards and provide specific numbers. Ensure that Part 6 includes all three subsections 6.1, 6.2, and 6.3.
+"""
+    }
+}
+
+# ================== 获取当前语言 ==================
+lang = st.session_state.lang
+t = TEXTS[lang]
+t["no_license"] = t["no_license"].format(st.session_state.trial_uses_left)
+t["trial_warning"] = t["trial_warning"].format(st.session_state.trial_uses_left)
+
+st.title(t["title"])
+
+# ================== 支付成功弹窗 ==================
+if st.session_state.get("show_payment_dialog", False):
+    @st.dialog("✅ 支付成功")
+    def payment_success_dialog():
+        st.markdown("### 您的授权码已生成" if lang=="zh" else "### Your license key has been generated")
+        st.code(st.session_state.payment_new_key, language="text")
+        st.caption("请妥善保管此授权码，下次使用时可手动复制并粘贴到左侧输入框。" if lang=="zh" else "Please save this license key. You can copy and paste it into the left sidebar next time.")
+        st.info("🔑 请复制上方授权码，然后关闭本窗口，回到您原先生成报告的那个窗口，将授权码粘贴到左侧边栏输入框中即可解锁下载。" if lang=="zh" else "🔑 Please copy the license key above, close this window, return to your original report window, and paste the key into the left sidebar to unlock download.")
+        st.markdown("---")
+        if st.button("确定" if lang=="zh" else "OK", use_container_width=True):
+            st.session_state.show_payment_dialog = False
+            for key in ["payment_new_key", "payment_plan_name"]:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
+    
+    payment_success_dialog()
+
+# ================== 支付回调处理 ==================
+params = st.query_params
+if "order_success" in params and "plan" in params:
+    plan = params["plan"]
+    current_lang = st.session_state.lang
+    
+    # 根据语言和套餐设置 uses, months, plan_name
+    if current_lang == "zh":
+        if plan == "single":
+            uses = 3
+            months = 9999
+            plan_name = "单次通行"
+        elif plan == "100":
+            uses = 100
+            months = 1
+            plan_name = "100次套餐"
+        elif plan == "1200":
+            uses = 1200
+            months = 12
+            plan_name = "1200次套餐"
+        else:
+            uses = 0
+            months = 0
+            plan_name = "未知"
+    else:
+        if plan == "single":
+            uses = 3
+            months = 9999
+            plan_name = "Single Pass"
+        elif plan == "100":
+            uses = 100
+            months = 1
+            plan_name = "100 Credits"
+        elif plan == "1200":
+            uses = 1200
+            months = 12
+            plan_name = "1200 Credits"
+        else:
+            uses = 0
+            months = 0
+            plan_name = "Unknown"
+    
+    if uses > 0:
+        new_key, max_uses, expiry_str, _ = generate_report_key("custom", custom_uses=uses, custom_months=months)
+        st.session_state.current_report_key = new_key
+        st.session_state.payment_new_key = new_key
+        st.session_state.payment_plan_name = plan_name
+        
+        # 清除 URL 参数，避免重复触发
+        st.query_params.clear()
+        # 设置标志，显示支付成功弹窗
+        st.session_state.show_payment_dialog = True
+        st.rerun()
+    else:
+        st.error("❌ 支付失败或套餐无效，请联系客服。" if lang=="zh" else "❌ Payment failed or plan invalid. Please contact support.")
+        st.query_params.clear()
+
+# ================== 购买对话框 ==================
+@st.dialog("购买+解锁" if lang=="zh" else "Purchase + Unlock", width="large")
+def purchase_dialog():
+    st.markdown("### 选择套餐" if lang=="zh" else "### Select Plan")
+    st.markdown("""
+| 套餐 | 价格 | 次数 | 有效期 |
+|------|------|------|--------|
+| 单次通行 | 18元 / 3美元 | 3次 | 无限制 |
+| 100次套餐 | 180元 / 30美元 | 100次 | 1个月 |
+| 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
+""" if lang=="zh" else """
+| Plan | Price | Credits | Validity |
+|------|-------|---------|----------|
+| Single Pass | 18 RMB / $3 | 3 uses | Unlimited |
+| 100 Credits | 180 RMB / $30 | 100 uses | 1 month |
+| 1200 Credits | 1200 RMB / $200 | 1200 uses | 12 months |
+""")
+    st.markdown("#### 🌍 国际支付（Stripe）" if lang=="zh" else "#### 🌍 International Payment (Stripe)")
+    
+    if not stripe.api_key:
+        st.error("Stripe 未配置，请联系管理员。" if lang=="zh" else "Stripe not configured. Please contact admin.")
+        return
+    
+    col1, col2, col3 = st.columns(3)
+    
+    # 单次通行 (3美元)
+    with col1:
+        if st.button("🎟️ Single Pass\n$3", use_container_width=True):
+            try:
+                checkout_session = stripe.checkout.Session.create(
+                    payment_method_types=["card"],
+                    line_items=[{
+                        "price_data": {
+                            "currency": "usd",
+                            "product_data": {"name": "单次通行 (3次使用)" if lang=="zh" else "Single Pass (3 uses)"},
+                            "unit_amount": 300,
+                        },
+                        "quantity": 1,
+                    }],
+                    mode="payment",
+                    success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=single",
+                    cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
+                    customer_creation="always",
+                )
+                st.success(t["payment_link_generated"])
+                button_html = f'<a href="{checkout_session.url}" target="_blank" style="display: block; background-color: #E60000; color: white; font-weight: bold; font-size: 18px; padding: 12px; border-radius: 8px; text-align: center; text-decoration: none; width: 100%;">{t["goto_stripe_button"]}</a>'
+                st.markdown(button_html, unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"创建支付会话失败: {e}" if lang=="zh" else f"Failed to create checkout session: {e}")
+    
+    # 100次套餐 (30美元)
+    with col2:
+        if st.button("📦 100 Credits\n$30", use_container_width=True):
+            try:
+                checkout_session = stripe.checkout.Session.create(
+                    payment_method_types=["card"],
+                    line_items=[{
+                        "price_data": {
+                            "currency": "usd",
+                            "product_data": {"name": "100次套餐" if lang=="zh" else "100 Credits"},
+                            "unit_amount": 3000,
+                        },
+                        "quantity": 1,
+                    }],
+                    mode="payment",
+                    success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=100",
+                    cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
+                    customer_creation="always",
+                )
+                st.success(t["payment_link_generated"])
+                button_html = f'<a href="{checkout_session.url}" target="_blank" style="display: block; background-color: #E60000; color: white; font-weight: bold; font-size: 18px; padding: 12px; border-radius: 8px; text-align: center; text-decoration: none; width: 100%;">{t["goto_stripe_button"]}</a>'
+                st.markdown(button_html, unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"创建支付会话失败: {e}" if lang=="zh" else f"Failed to create checkout session: {e}")
+    
+    # 1200次套餐 (200美元)
+    with col3:
+        if st.button("🚀 1200 Credits\n$200", use_container_width=True):
+            try:
+                checkout_session = stripe.checkout.Session.create(
+                    payment_method_types=["card"],
+                    line_items=[{
+                        "price_data": {
+                            "currency": "usd",
+                            "product_data": {"name": "1200次套餐" if lang=="zh" else "1200 Credits"},
+                            "unit_amount": 20000,
+                        },
+                        "quantity": 1,
+                    }],
+                    mode="payment",
+                    success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=1200",
+                    cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
+                    customer_creation="always",
+                )
+                st.success(t["payment_link_generated"])
+                button_html = f'<a href="{checkout_session.url}" target="_blank" style="display: block; background-color: #E60000; color: white; font-weight: bold; font-size: 18px; padding: 12px; border-radius: 8px; text-align: center; text-decoration: none; width: 100%;">{t["goto_stripe_button"]}</a>'
+                st.markdown(button_html, unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"创建支付会话失败: {e}" if lang=="zh" else f"Failed to create checkout session: {e}")
+    
+    st.markdown("#### 🇨🇳 国内支付（支付宝/微信）" if lang=="zh" else "#### 🇨🇳 Domestic Payment (Alipay/WeChat Pay)")
+    st.info("支持信用卡支付。支付宝和微信支付即将开放。" if lang=="zh" else "Credit card payments are supported. Alipay and WeChat Pay coming soon.")
+    st.markdown("支付成功后会自动跳回本页面，授权码将自动激活。" if lang=="zh" else "You will be redirected back after payment, and the license key will be auto-activated.")
+
+# ================== 侧边栏 ==================
+with st.sidebar:
+    report_key_input = st.text_input(
+        t["report_key_label"],
+        value=st.session_state.current_report_key,
+        type="password",
+        key="report_key_widget"
+    )
+    if report_key_input:
+        valid, remaining, expiry_str, lic_type = activate_license(report_key_input)
+        if valid:
+            st.success(f"授权成功！剩余 {remaining} 次，有效期至 {expiry_str[:10]}" if lang=="zh" else f"Success! {remaining} uses left, valid until {expiry_str[:10]}")
+            st.session_state.current_report_key = report_key_input
+        else:
+            if report_key_input != st.session_state.current_report_key:
+                st.error("授权码无效或已过期" if lang=="zh" else "Invalid or expired license key")
+                st.session_state.current_report_key = ""
+                st.session_state.current_license_type = None
+    else:
+        if st.session_state.trial_uses_left > 0:
+            st.warning(t["trial_warning"])
+        else:
+            st.error(t["trial_ended"])
+    if st.session_state.admin_logged_in:
+        st.info("管理员模式：无限使用" if lang=="zh" else "Admin mode: unlimited usage")
+    else:
+        remaining_str, expiry_str = get_remaining_info(st.session_state.current_report_key)
+        st.markdown(f"**{t['license_info']}**")
+        st.write(f"{t['remaining_label']}: {remaining_str}")
+        if expiry_str != "试用剩余次数" and expiry_str != "Trial left":
+            st.write(f"{t['expiry_label']}: {expiry_str}")
+    st.markdown("---")
+    st.markdown(t["contact_info"])
+    st.markdown("---")
+    st.markdown(f"## {t['purchase_title']}")
+    if st.button(t["purchase_button"], use_container_width=True):
+        purchase_dialog()
+    st.markdown("---")
+    st.markdown(f"## {t['sidebar_title']}")
+    st.markdown(t["sidebar_basis"])
+    for item in t["basis_items"]:
+        st.markdown(f"- {item}")
+    st.markdown("---")
+    analyst_name = st.text_input(t["analyst_name_label"], placeholder=t["analyst_name_ph"])
+    analyst_title = st.text_input(t["analyst_title_label"], placeholder=t["analyst_title_ph"])
+    if analyst_name:
+        st.markdown(f"**{t['analyst_name_label']}: {analyst_name}**")
+        if analyst_title:
+            st.markdown(f"_{analyst_title}_")
+    else:
+        st.caption(t["analyst_name_ph"])
+    st.markdown("---")
+    st.markdown(f"**{t['api_status']}**")
+    if st.session_state.ai_api_key:
+        st.success(t["api_configured"])
+    else:
+        st.error(t["api_not_configured"])
+
+# ================== 主表单 ==================
+st.markdown(f"### {t['input_title']}")
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown(f"#### {t['basic_info']}")
+    product_name = st.text_input(t["product_name"], placeholder=t["product_name_ph"])
+    product_description = st.text_area(t["product_desc"], placeholder=t["product_desc_ph"], height=100)
+    target_markets = st.multiselect(t["target_markets"], options=t["market_options"], default=[t["market_options"][0]])
+    target_users = st.text_input(t["target_users"], placeholder=t["target_users_ph"])
+with col2:
+    st.markdown(f"#### {t['market_channel']}")
+    channel_status = st.selectbox(t["channel_status"], options=t["channel_options"])
+    channel_detail = st.text_area(t["channel_detail"], placeholder=t["channel_detail_ph"], height=80)
+    brand_status = st.selectbox(t["brand_status"], options=t["brand_options"])
+st.markdown(f"#### {t['tech_capability']}")
+col3, col4 = st.columns(2)
+with col3:
+    tech_experience = st.multiselect(t["tech_experience"], options=t["tech_options"], default=[])
+with col4:
+    dev_stage = st.selectbox(t["dev_stage"], options=t["stage_options"])
+st.markdown(f"#### {t['business_goals']}")
+col5, col6 = st.columns(2)
+with col5:
+    estimated_budget = st.selectbox(t["estimated_budget"], options=t["budget_options"])
+with col6:
+    sales_target = st.text_input(t["sales_target"], placeholder=t["sales_target_ph"])
+st.markdown(f"#### {t['other_info']}")
+additional_info = st.text_area("", placeholder=t["other_ph"], height=80)
+
+# ================== 提交按钮 ==================
+st.markdown("---")
+col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+with col_btn2:
+    submitted = st.button(t["submit_btn"], type="primary", use_container_width=True)
+spinner_placeholder = st.empty()
+
+# ================== 报告生成逻辑 ==================
+if submitted:
+    if not product_name:
+        st.error(t["product_name_missing"])
+    elif not st.session_state.ai_api_key:
+        st.error(t["api_key_missing"])
+    else:
+        can_generate = False
+        if st.session_state.admin_logged_in:
+            can_generate = True
+        elif is_premium_user(st.session_state.current_report_key):
+            if consume_usage(st.session_state.current_report_key):
+                can_generate = True
+            else:
+                st.error(t["trial_ended"])
+        else:
+            if st.session_state.trial_uses_left > 0:
+                can_generate = True
+            else:
+                st.error(t["trial_ended"])
+        if can_generate:
+            if not is_premium_user(st.session_state.current_report_key):
+                consume_usage("")
+            st.session_state.pulse_active = True
+            with spinner_placeholder.container():
+                st.markdown(f'<div style="text-align: center; margin-top: 10px;">{t["generating"]}</div>', unsafe_allow_html=True)
+                with st.spinner(""):
+                    try:
+                        if analyst_name:
+                            if analyst_title:
+                                analyst_info = f"{analyst_name} ({analyst_title})"
+                            else:
+                                analyst_info = analyst_name
+                        else:
+                            analyst_info = "AI 分析师（基于行业数据库）" if lang == "zh" else "AI Analyst (based on industry database)"
+                        from openai import OpenAI
+                        client = OpenAI(
+                            api_key=st.session_state.ai_api_key,
+                            base_url=st.session_state.ai_base_url,
+                        )
+                        prompt_template = t["report_prompt"]
+                        target_markets_str = ", ".join(target_markets)
+                        prompt = prompt_template.format(
+                            product_name=product_name,
+                            product_description=product_description or "未提供",
+                            target_markets=target_markets_str,
+                            target_users=target_users or "未提供",
+                            channel_status=channel_status,
+                            channel_detail=channel_detail or "未提供",
+                            brand_status=brand_status
+                        )
+                        response = client.chat.completions.create(
+                            model=st.session_state.ai_model_name,
+                            messages=[{"role": "user", "content": prompt}],
+                            temperature=0.7,
+                            max_tokens=8000
+                        )
+                        report_content = response.choices[0].message.content
+                        if lang == "zh":
+                            current_date = datetime.now().strftime("%Y年%m月%d日")
+                            report_content = re.sub(r'\d{4}年\d{1,2}月\d{1,2}日', current_date, report_content)
+                            report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
+                        else:
+                            current_date = datetime.now().strftime("%B %d, %Y")
+                            report_content = re.sub(r'\d{4}-\d{2}-\d{2}', current_date, report_content)
+                            report_content = re.sub(r'[A-Z][a-z]+ \d{1,2}, \d{4}', current_date, report_content)
+                        report_content = report_content.replace("{{CURRENT_DATE}}", current_date)
+                        report_content = report_content.replace("{{ANALYST_INFO}}", analyst_info)
+                        if lang == "zh":
+                            report_content = re.sub(r'(\| 分析人 \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
+                        else:
+                            report_content = re.sub(r'(\| Analyst \|).*?(\|)', rf'\1 {analyst_info} \2', report_content, flags=re.DOTALL)
+                        report_content = re.sub(r'\*+', '', report_content)
+                        if lang == "zh":
+                            st.session_state.report_content_zh = report_content
+                        else:
+                            st.session_state.report_content_en = report_content
+                        st.session_state.pulse_active = False
+                        st.rerun()
+                    except Exception as e:
+                        st.session_state.pulse_active = False
+                        st.error(f"{t['error_prefix']}{e}")
+
+# ================== 显示报告 ==================
+current_report = None
+if lang == "zh":
+    current_report = st.session_state.report_content_zh
+else:
+    current_report = st.session_state.report_content_en
+
+if current_report:
+    premium = is_premium_user(st.session_state.current_report_key)
+    add_security_css(disable=premium)
+    show_watermark = not premium
+    add_dynamic_watermark(lang, hide=not show_watermark)
+    st.markdown(f"## {t['report_title']}")
+    st.markdown(current_report, unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown(f"### {t['download_section']}")
+    if premium:
+        doc = Document()
+        markdown_to_docx(current_report, doc, lang)
+        doc_bytes = BytesIO()
+        doc.save(doc_bytes)
+        doc_bytes.seek(0)
+        st.download_button(
+            label=t["download_btn"],
+            data=doc_bytes,
+            file_name=f"{product_name}_Feasibility_Report.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+    else:
+        if st.button(t["download_unlock_btn"], use_container_width=True):
+            purchase_dialog()
+    if st.button(t["back_btn"]):
+        if lang == "zh":
+            st.session_state.report_content_zh = None
+        else:
+            st.session_state.report_content_en = None
+        st.rerun()
+else:
+    st.markdown("---")
+    st.caption(t["footer"])
