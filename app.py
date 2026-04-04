@@ -214,6 +214,24 @@ def add_security_css(disable=False):
         th, td {
             padding: 6px;
         }
+        /* 侧边栏购买按钮红色加粗突出 */
+        div[data-testid="stSidebar"] .stButton button {
+            background-color: #E60000 !important;
+            color: white !important;
+            font-weight: bold !important;
+            font-size: 18px !important;
+            border: none !important;
+            padding: 0.5rem 1rem !important;
+            width: 100% !important;
+        }
+        div[data-testid="stSidebar"] .stButton button:hover {
+            background-color: #B30000 !important;
+            color: white !important;
+        }
+        /* 主按钮样式（非侧边栏）也可以加强 */
+        .stButton button {
+            font-weight: bold !important;
+        }
     </style>
     <div class="bg-watermark"></div>
     <script>
@@ -1074,6 +1092,7 @@ with st.sidebar:
     st.markdown(t["contact_info"])
     st.markdown("---")
     st.markdown(f"## {t['purchase_title']}")
+    # 侧边栏购买按钮（CSS已将其变为红色加粗）
     if st.button(t["purchase_button"], use_container_width=True):
         purchase_dialog()
     st.markdown("---")
