@@ -973,7 +973,7 @@ def purchase_dialog():
                     customer_creation="always",
                 )
                 st.success(t["payment_link_generated"])
-                col_left, col_right = st.columns([1, 1])  # 调整列宽比例，让按钮更宽
+                col_left, col_right = st.columns([1, 3])  # 调整列宽比例，让按钮更宽
                 with col_left:
                     st.markdown(t["payment_hint"])
                 with col_right:
