@@ -461,6 +461,8 @@ TEXTS = {
         "expiry_label": "有效期至",
         "contact_info": "📞 **联系：**  \n✉️ 电邮: Techlife2027@gmail.com  \n📱 电话/微信: +86-13823760640",
         "purchase_title": "💰 购买+解锁",
+        "purchase_button": "💰 购买授权码",
+        "goto_stripe_button": "前往 Stripe 支付页面",
         "input_title": "📝 产品信息输入",
         "basic_info": "基本信息",
         "product_name": "产品名称",
@@ -656,6 +658,8 @@ TEXTS = {
         "expiry_label": "Valid until",
         "contact_info": "📞 **Contact: Laurence**  \n✉️ Email: Techlife2027@gmail.com  \n📱 Phone/Wechat: +86-13823760640",
         "purchase_title": "💰 Purchase + Unlock",
+        "purchase_button": "💰 Purchase License",
+        "goto_stripe_button": "Go to Stripe Payment Page",
         "input_title": "📝 Product Information Input",
         "basic_info": "Basic Information",
         "product_name": "Product Name",
@@ -941,27 +945,27 @@ def purchase_dialog():
         if st.button("🎟️ Single Pass\n$3", use_container_width=True):
             try:
                 checkout_session = stripe.checkout.Session.create(
-                    payment_method_types=["card", "alipay", "wechat_pay"],  # 支持信用卡、支付宝、微信支付
+                    payment_method_types=["card", "alipay", "wechat_pay"],
                     line_items=[{
                         "price_data": {
-                            "currency": "cny",  # 使用人民币，Stripe 自动转换美元
+                            "currency": "cny",
                             "product_data": {"name": "单次通行 (3次使用)"},
-                            "unit_amount": 2100,  # 21.00 元 (约 3 美元)
+                            "unit_amount": 2100,
                         },
                         "quantity": 1,
                     }],
                     mode="payment",
                     payment_method_options={
-                        "wechat_pay": {
-                            "client": "web"  # 必须指定为网页端
-                        }
+                        "wechat_pay": {"client": "web"}
                     },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=single",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                st.success("✅ 支付链接已生成，请点击下方按钮完成支付")
-                st.link_button("前往 Stripe 支付页面", checkout_session.url)
+                st.success("✅ 支付链接已生成")
+                # 使用主色调按钮，点击后在新标签页打开支付页面
+                if st.button(t["goto_stripe_button"], type="primary", use_container_width=True):
+                    st.markdown(f'<script>window.open("{checkout_session.url}", "_blank");</script>', unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}")
     
@@ -975,22 +979,21 @@ def purchase_dialog():
                         "price_data": {
                             "currency": "cny",
                             "product_data": {"name": "100次套餐"},
-                            "unit_amount": 21000,  # 210.00 元
+                            "unit_amount": 21000,
                         },
                         "quantity": 1,
                     }],
                     mode="payment",
                     payment_method_options={
-                        "wechat_pay": {
-                            "client": "web"
-                        }
+                        "wechat_pay": {"client": "web"}
                     },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=100",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                st.success("✅ 支付链接已生成，请点击下方按钮完成支付")
-                st.link_button("前往 Stripe 支付页面", checkout_session.url)
+                st.success("✅ 支付链接已生成")
+                if st.button(t["goto_stripe_button"], type="primary", use_container_width=True):
+                    st.markdown(f'<script>window.open("{checkout_session.url}", "_blank");</script>', unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}")
     
@@ -1004,22 +1007,21 @@ def purchase_dialog():
                         "price_data": {
                             "currency": "cny",
                             "product_data": {"name": "1200次套餐"},
-                            "unit_amount": 140000,  # 1400.00 元
+                            "unit_amount": 140000,
                         },
                         "quantity": 1,
                     }],
                     mode="payment",
                     payment_method_options={
-                        "wechat_pay": {
-                            "client": "web"
-                        }
+                        "wechat_pay": {"client": "web"}
                     },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=1200",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                st.success("✅ 支付链接已生成，请点击下方按钮完成支付")
-                st.link_button("前往 Stripe 支付页面", checkout_session.url)
+                st.success("✅ 支付链接已生成")
+                if st.button(t["goto_stripe_button"], type="primary", use_container_width=True):
+                    st.markdown(f'<script>window.open("{checkout_session.url}", "_blank");</script>', unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}")
     
@@ -1062,7 +1064,7 @@ with st.sidebar:
     st.markdown(t["contact_info"])
     st.markdown("---")
     st.markdown(f"## {t['purchase_title']}")
-    if st.button("💰 购买授权码", use_container_width=True):
+    if st.button(t["purchase_button"], use_container_width=True):   # 国际化按钮
         purchase_dialog()
     st.markdown("---")
     st.markdown(f"## {t['sidebar_title']}")
