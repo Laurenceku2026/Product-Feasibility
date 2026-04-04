@@ -973,25 +973,22 @@ def purchase_dialog():
         if st.button("🎟️ Single Pass\n$3", use_container_width=True):
             try:
                 checkout_session = stripe.checkout.Session.create(
-                    payment_method_types=["card"],
+                    payment_method_types=["card"],  # 暂时只保留信用卡
                     line_items=[{
                         "price_data": {
-                            "currency": "cny",
+                            "currency": "usd",  # 美元
                             "product_data": {"name": "单次通行 (3次使用)" if lang=="zh" else "Single Pass (3 uses)"},
-                            "unit_amount": 2100,
+                            "unit_amount": 300,  # 3美元 = 300美分
                         },
                         "quantity": 1,
                     }],
                     mode="payment",
-                    payment_method_options={
-                        "wechat_pay": {"client": "web"}
-                    },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=single",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
                 st.success(t["payment_link_generated"])
-                # 自定义更红的按钮
+                # 自定义红色大按钮
                 button_html = f'<a href="{checkout_session.url}" target="_blank" style="display: block; background-color: #E60000; color: white; font-weight: bold; font-size: 18px; padding: 12px; border-radius: 8px; text-align: center; text-decoration: none; width: 100%;">{t["goto_stripe_button"]}</a>'
                 st.markdown(button_html, unsafe_allow_html=True)
             except Exception as e:
@@ -1005,16 +1002,13 @@ def purchase_dialog():
                     payment_method_types=["card"],
                     line_items=[{
                         "price_data": {
-                            "currency": "cny",
+                            "currency": "usd",
                             "product_data": {"name": "100次套餐" if lang=="zh" else "100 Credits"},
-                            "unit_amount": 21000,
+                            "unit_amount": 3000,  # 30美元
                         },
                         "quantity": 1,
                     }],
                     mode="payment",
-                    payment_method_options={
-                        "wechat_pay": {"client": "web"}
-                    },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=100",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
@@ -1033,16 +1027,13 @@ def purchase_dialog():
                     payment_method_types=["card"],
                     line_items=[{
                         "price_data": {
-                            "currency": "cny",
+                            "currency": "usd",
                             "product_data": {"name": "1200次套餐" if lang=="zh" else "1200 Credits"},
-                            "unit_amount": 140000,
+                            "unit_amount": 20000,  # 200美元
                         },
                         "quantity": 1,
                     }],
                     mode="payment",
-                    payment_method_options={
-                        "wechat_pay": {"client": "web"}
-                    },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=1200",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
@@ -1054,7 +1045,7 @@ def purchase_dialog():
                 st.error(f"创建支付会话失败: {e}" if lang=="zh" else f"Failed to create checkout session: {e}")
     
     st.markdown("#### 🇨🇳 国内支付（支付宝/微信）" if lang=="zh" else "#### 🇨🇳 Domestic Payment (Alipay/WeChat Pay)")
-    st.info("支持支付宝、微信支付和信用卡，支付成功后自动激活授权码。" if lang=="zh" else "Supports Alipay, WeChat Pay, and credit cards. License key will be auto-activated after payment.")
+    st.info("支持信用卡支付。支付宝和微信支付即将开放。" if lang=="zh" else "Credit card payments are supported. Alipay and WeChat Pay coming soon.")
     st.markdown("支付成功后会自动跳回本页面，授权码将自动激活。" if lang=="zh" else "You will be redirected back after payment, and the license key will be auto-activated.")
 
 # ================== 侧边栏 ==================
@@ -1092,7 +1083,6 @@ with st.sidebar:
     st.markdown(t["contact_info"])
     st.markdown("---")
     st.markdown(f"## {t['purchase_title']}")
-    # 侧边栏购买按钮（CSS已将其变为红色加粗）
     if st.button(t["purchase_button"], use_container_width=True):
         purchase_dialog()
     st.markdown("---")
