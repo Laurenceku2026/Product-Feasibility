@@ -979,7 +979,8 @@ def purchase_dialog():
                 )
                 st.success(t["payment_link_generated"])
                 # 使用红色加粗按钮，占满整行
-                st.link_button(t["goto_stripe_button"], checkout_session.url, use_container_width=True)
+                button_html = f'<a href="{checkout_session.url}" target="_blank" style="display: block; background-color: #E60000; color: white; font-weight: bold; font-size: 18px; padding: 12px; border-radius: 8px; text-align: center; text-decoration: none; width: 100%;">{t["goto_stripe_button"]}</a>'
+st.markdown(button_html, unsafe_allow_html=True)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}" if lang=="zh" else f"Failed to create checkout session: {e}")
     
