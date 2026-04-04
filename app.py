@@ -926,7 +926,7 @@ if "order_success" in params and "plan" in params:
         st.query_params.clear()
 
 # ================== 购买对话框 ==================
-@st.dialog("购买+解锁" if lang=="zh" else "Purchase + Unlock", width="large")
+@st.dialog("购买+解锁" if lang=="zh" else "Purchase + Unlock")
 def purchase_dialog():
     st.markdown("### 选择套餐" if lang=="zh" else "### Select Plan")
     st.markdown("""
