@@ -1002,7 +1002,7 @@ def purchase_dialog():
         if st.button("📦 100 Credits\n$30", use_container_width=True):
             try:
                 checkout_session = stripe.checkout.Session.create(
-                    payment_method_types=["card", "alipay", "wechat_pay"],
+                    payment_method_types=["card"],
                     line_items=[{
                         "price_data": {
                             "currency": "cny",
@@ -1030,7 +1030,7 @@ def purchase_dialog():
         if st.button("🚀 1200 Credits\n$200", use_container_width=True):
             try:
                 checkout_session = stripe.checkout.Session.create(
-                    payment_method_types=["card", "alipay", "wechat_pay"],
+                    payment_method_types=["card"],
                     line_items=[{
                         "price_data": {
                             "currency": "cny",
