@@ -554,13 +554,13 @@ TEXTS = {
         "brand_status": "品牌认知度",
         "brand_options": ["高（知名品牌）", "中（行业内有认知）", "低（需要建立品牌）"],
         "tech_capability": "技术能力",
-        "tech_experience": "相关技术经验",
-        "tech_options": ["智能硬件/物联网", "APP开发", "机械结构设计", "光学设计", "电子电路", "供应链管理", "海外认证（UL/CE/FCC）", "DFSS/六西格玛"],
+        "tech_experience_label": "相关技术经验（可手动输入）",
+        "tech_experience_ph": "例如：智能硬件/物联网、APP开发、机械结构设计、光学设计、电子电路、供应链管理等",
         "dev_stage": "产品开发阶段",
         "stage_options": ["概念/想法", "调研中", "已立项", "开发中", "已有样机"],
         "business_goals": "商业目标",
-        "estimated_budget": "预估研发预算",
-        "budget_options": ["50万以下", "50-100万", "100-200万", "200-500万", "500万以上"],
+        "estimated_budget_label": "预估研发预算（可手动输入）",
+        "estimated_budget_ph": "例如：50万以下、50-100万、100-200万、200-500万、500万以上，或直接输入具体金额",
         "sales_target": "首年销售目标",
         "sales_target_ph": "例如：1000万人民币 / 200万美元",
         "other_info": "其他信息",
@@ -753,13 +753,13 @@ TEXTS = {
         "brand_status": "Brand Awareness",
         "brand_options": ["High (well-known)", "Medium (recognized in industry)", "Low (need to build brand)"],
         "tech_capability": "Technical Capability",
-        "tech_experience": "Relevant Tech Experience",
-        "tech_options": ["Smart Hardware/IoT", "App Development", "Mechanical Design", "Optical Design", "Electronic Circuits", "Supply Chain Management", "Overseas Certification (UL/CE/FCC)", "DFSS/Six Sigma"],
+        "tech_experience_label": "Relevant Tech Experience (free text)",
+        "tech_experience_ph": "e.g., Smart Hardware/IoT, App Development, Mechanical Design, Optical Design, Electronic Circuits, Supply Chain Management",
         "dev_stage": "Development Stage",
         "stage_options": ["Idea/Concept", "Researching", "Project approved", "Developing", "Prototype ready"],
         "business_goals": "Business Goals",
-        "estimated_budget": "Estimated R&D Budget",
-        "budget_options": ["Under 500k", "500k-1M", "1M-2M", "2M-5M", "Above 5M"],
+        "estimated_budget_label": "Estimated R&D Budget (free text)",
+        "estimated_budget_ph": "e.g., Under 500k, 500k-1M, 1M-2M, 2M-5M, Above 5M, or specific amount",
         "sales_target": "First Year Sales Target",
         "sales_target_ph": "e.g., 10M RMB / 2M USD",
         "other_info": "Other Information",
@@ -1028,7 +1028,7 @@ def purchase_dialog():
         if st.button("🎟️ Single Pass\n$3", use_container_width=True):
             try:
                 checkout_session = stripe.checkout.Session.create(
-                    payment_method_types=["card", "wechat_pay"],  # 支持信用卡和微信支付
+                    payment_method_types=["card", "wechat_pay"],
                     line_items=[{
                         "price_data": {
                             "currency": "usd",
@@ -1039,7 +1039,7 @@ def purchase_dialog():
                     }],
                     mode="payment",
                     payment_method_options={
-                        "wechat_pay": {"client": "web"}  # 微信支付必须指定 web 环境
+                        "wechat_pay": {"client": "web"}
                     },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=single",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
@@ -1204,14 +1204,23 @@ with col2:
 st.markdown(f"#### {t['tech_capability']}")
 col3, col4 = st.columns(2)
 with col3:
-    tech_experience = st.multiselect(t["tech_experience"], options=t["tech_options"], default=[])
+    # 技术能力改为文本输入框
+    tech_experience = st.text_area(
+        t["tech_experience_label"],
+        placeholder=t["tech_experience_ph"],
+        height=80
+    )
 with col4:
     dev_stage = st.selectbox(t["dev_stage"], options=t["stage_options"])
 
 st.markdown(f"#### {t['business_goals']}")
 col5, col6 = st.columns(2)
 with col5:
-    estimated_budget = st.selectbox(t["estimated_budget"], options=t["budget_options"])
+    # 研发预算改为文本输入框
+    estimated_budget = st.text_input(
+        t["estimated_budget_label"],
+        placeholder=t["estimated_budget_ph"]
+    )
 with col6:
     sales_target = st.text_input(t["sales_target"], placeholder=t["sales_target_ph"])
 
