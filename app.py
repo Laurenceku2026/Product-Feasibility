@@ -1172,29 +1172,49 @@ with st.sidebar:
 # ================== 主表单 ==================
 st.markdown(f"### {t['input_title']}")
 col1, col2 = st.columns(2)
+
 with col1:
     st.markdown(f"#### {t['basic_info']}")
     product_name = st.text_input(t["product_name"], placeholder=t["product_name_ph"])
     product_description = st.text_area(t["product_desc"], placeholder=t["product_desc_ph"], height=100)
-    target_markets = st.multiselect(t["target_markets"], options=t["market_options"], default=[t["market_options"][0]])
+    
+    # 目标市场多选
+    st.markdown(f"**{t['target_markets']}**")
+    selected_markets = st.multiselect(
+        "",
+        options=t["market_options"],
+        default=[t["market_options"][0]],
+        label_visibility="collapsed"
+    )
+    # 自定义市场输入
+    custom_market = st.text_input(
+        "其他市场（可手动输入，多个市场请用逗号分隔）" if lang=="zh" else "Other markets (comma separated)",
+        placeholder="例如：东南亚, 中东" if lang=="zh" else "e.g., Southeast Asia, Middle East",
+        key="custom_market_input"
+    )
+    
     target_users = st.text_input(t["target_users"], placeholder=t["target_users_ph"])
+
 with col2:
     st.markdown(f"#### {t['market_channel']}")
     channel_status = st.selectbox(t["channel_status"], options=t["channel_options"])
     channel_detail = st.text_area(t["channel_detail"], placeholder=t["channel_detail_ph"], height=80)
     brand_status = st.selectbox(t["brand_status"], options=t["brand_options"])
+
 st.markdown(f"#### {t['tech_capability']}")
 col3, col4 = st.columns(2)
 with col3:
     tech_experience = st.multiselect(t["tech_experience"], options=t["tech_options"], default=[])
 with col4:
     dev_stage = st.selectbox(t["dev_stage"], options=t["stage_options"])
+
 st.markdown(f"#### {t['business_goals']}")
 col5, col6 = st.columns(2)
 with col5:
     estimated_budget = st.selectbox(t["estimated_budget"], options=t["budget_options"])
 with col6:
     sales_target = st.text_input(t["sales_target"], placeholder=t["sales_target_ph"])
+
 st.markdown(f"#### {t['other_info']}")
 additional_info = st.text_area("", placeholder=t["other_ph"], height=80)
 
@@ -1246,7 +1266,15 @@ if submitted:
                             base_url=st.session_state.ai_base_url,
                         )
                         prompt_template = t["report_prompt"]
-                        target_markets_str = ", ".join(target_markets)
+                        
+                        # 合并目标市场（选择 + 自定义）
+                        all_markets = selected_markets.copy()
+                        custom_market_val = st.session_state.get("custom_market_input", "")
+                        if custom_market_val and custom_market_val.strip():
+                            custom_list = [m.strip() for m in custom_market_val.split(",") if m.strip()]
+                            all_markets.extend(custom_list)
+                        target_markets_str = ", ".join(all_markets)
+                        
                         prompt = prompt_template.format(
                             product_name=product_name,
                             product_description=product_description or "未提供",
