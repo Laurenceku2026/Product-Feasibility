@@ -426,11 +426,11 @@ def admin_settings_dialog():
 # ================== 右上角按钮 ==================
 col1, col2, col3, col4 = st.columns([8, 1, 1, 1])
 with col2:
-    if st.button("中文", key="zh_btn", type="primary"):
+    if st.button("中文", key="zh_btn"):
         st.session_state.lang = "zh"
         st.rerun()
 with col3:
-    if st.button("English", key="en_btn", type="primary"):
+    if st.button("English", key="en_btn"):
         st.session_state.lang = "en"
         st.rerun()
 with col4:
@@ -461,8 +461,6 @@ TEXTS = {
         "expiry_label": "有效期至",
         "contact_info": "📞 **联系：**  \n✉️ 电邮: Techlife2027@gmail.com  \n📱 电话/微信: +86-13823760640",
         "purchase_title": "💰 购买+解锁",
-        "purchase_button": "💰 购买授权码",
-        "goto_stripe_button": "前往 Stripe 支付页面",
         "input_title": "📝 产品信息输入",
         "basic_info": "基本信息",
         "product_name": "产品名称",
@@ -507,8 +505,6 @@ TEXTS = {
         "trial_ended": "试用次数已用完，请联系 Techlife2027@gmail.com 购买授权码",
         "no_license": "未输入授权码，当前为试用模式（剩余次数：{}）",
         "trial_warning": "⚠️ 您还有 {} 次试用机会，输入授权码可解锁无限使用和下载功能。",
-        "payment_link_generated": "✅ 支付链接已生成",
-        "payment_hint": "请点击下方按钮完成支付",
         "report_prompt": """
 你是一位资深产品分析师和研发顾问，拥有25年消费电子及智能硬件行业经验。请根据以下产品信息，生成一份专业的《产品可行性分析报告》。
 
@@ -660,8 +656,6 @@ TEXTS = {
         "expiry_label": "Valid until",
         "contact_info": "📞 **Contact: Laurence**  \n✉️ Email: Techlife2027@gmail.com  \n📱 Phone/Wechat: +86-13823760640",
         "purchase_title": "💰 Purchase + Unlock",
-        "purchase_button": "💰 Purchase License",
-        "goto_stripe_button": "Go to Stripe Payment Page",
         "input_title": "📝 Product Information Input",
         "basic_info": "Basic Information",
         "product_name": "Product Name",
@@ -706,8 +700,6 @@ TEXTS = {
         "trial_ended": "Trial credits used up, please contact Techlife2027@gmail.com to purchase a license",
         "no_license": "No Report Key entered. Trial mode (remaining credits: {})",
         "trial_warning": "⚠️ You have {} trial credits left. Enter a license key to unlock unlimited usage and download.",
-        "payment_link_generated": "✅ Payment link generated",
-        "payment_hint": "Click the button below to pay",
         "report_prompt": """
 You are a senior product analyst and R&D consultant with 25 years of experience in consumer electronics and smart hardware. Based on the following product information, generate a professional "Product Feasibility Analysis Report".
 
@@ -854,12 +846,12 @@ st.title(t["title"])
 if st.session_state.get("show_payment_dialog", False):
     @st.dialog("✅ 支付成功")
     def payment_success_dialog():
-        st.markdown("### 您的授权码已生成" if lang=="zh" else "### Your license key has been generated")
+        st.markdown("### 您的授权码已生成")
         st.code(st.session_state.payment_new_key, language="text")
-        st.caption("请妥善保管此授权码，下次使用时可手动复制并粘贴到左侧输入框。" if lang=="zh" else "Please save this license key. You can copy and paste it into the left sidebar next time.")
-        st.info("🔑 请复制上方授权码，然后关闭本窗口，回到您原先生成报告的那个窗口，将授权码粘贴到左侧边栏输入框中即可解锁下载。" if lang=="zh" else "🔑 Please copy the license key above, close this window, return to your original report window, and paste the key into the left sidebar to unlock download.")
+        st.caption("请妥善保管此授权码，下次使用时可手动复制并粘贴到左侧输入框。")
+        st.info("🔑 请复制上方授权码，然后关闭本窗口，回到您原先生成报告的那个窗口，将授权码粘贴到左侧边栏输入框中即可解锁下载。")
         st.markdown("---")
-        if st.button("确定" if lang=="zh" else "OK", use_container_width=True):
+        if st.button("确定", use_container_width=True):
             st.session_state.show_payment_dialog = False
             for key in ["payment_new_key", "payment_plan_name"]:
                 if key in st.session_state:
@@ -877,7 +869,7 @@ if "order_success" in params and "plan" in params:
     # 根据语言和套餐设置 uses, months, plan_name
     if current_lang == "zh":
         if plan == "single":
-            uses = 3
+            uses = 3          # 单次通行实际给 3 次
             months = 9999
             plan_name = "单次通行"
         elif plan == "100":
@@ -892,7 +884,7 @@ if "order_success" in params and "plan" in params:
             uses = 0
             months = 0
             plan_name = "未知"
-    else:
+    else:  # English
         if plan == "single":
             uses = 3
             months = 9999
@@ -922,30 +914,24 @@ if "order_success" in params and "plan" in params:
         st.session_state.show_payment_dialog = True
         st.rerun()
     else:
-        st.error("❌ 支付失败或套餐无效，请联系客服。" if lang=="zh" else "❌ Payment failed or plan invalid. Please contact support.")
+        st.error("❌ 支付失败或套餐无效，请联系客服。")
         st.query_params.clear()
 
 # ================== 购买对话框 ==================
-@st.dialog("购买+解锁" if lang=="zh" else "Purchase + Unlock")
+@st.dialog("购买+解锁")
 def purchase_dialog():
-    st.markdown("### 选择套餐" if lang=="zh" else "### Select Plan")
+    st.markdown("### 选择套餐")
     st.markdown("""
 | 套餐 | 价格 | 次数 | 有效期 |
 |------|------|------|--------|
 | 单次通行 | 18元 / 3美元 | 3次 | 无限制 |
 | 100次套餐 | 180元 / 30美元 | 100次 | 1个月 |
 | 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
-""" if lang=="zh" else """
-| Plan | Price | Credits | Validity |
-|------|-------|---------|----------|
-| Single Pass | 18 RMB / $3 | 3 uses | Unlimited |
-| 100 Credits | 180 RMB / $30 | 100 uses | 1 month |
-| 1200 Credits | 1200 RMB / $200 | 1200 uses | 12 months |
 """)
-    st.markdown("#### 🌍 国际支付（Stripe）" if lang=="zh" else "#### 🌍 International Payment (Stripe)")
+    st.markdown("#### 🌍 国际支付（Stripe）")
     
     if not stripe.api_key:
-        st.error("Stripe 未配置，请联系管理员。" if lang=="zh" else "Stripe not configured. Please contact admin.")
+        st.error("Stripe 未配置，请联系管理员。")
         return
     
     col1, col2, col3 = st.columns(3)
@@ -955,35 +941,29 @@ def purchase_dialog():
         if st.button("🎟️ Single Pass\n$3", use_container_width=True):
             try:
                 checkout_session = stripe.checkout.Session.create(
-                    payment_method_types=["card", "alipay", "wechat_pay"],
+                    payment_method_types=["card", "alipay", "wechat_pay"],  # 支持信用卡、支付宝、微信支付
                     line_items=[{
                         "price_data": {
-                            "currency": "cny",
-                            "product_data": {"name": "单次通行 (3次使用)" if lang=="zh" else "Single Pass (3 uses)"},
-                            "unit_amount": 2100,
+                            "currency": "cny",  # 使用人民币，Stripe 自动转换美元
+                            "product_data": {"name": "单次通行 (3次使用)"},
+                            "unit_amount": 2100,  # 21.00 元 (约 3 美元)
                         },
                         "quantity": 1,
                     }],
                     mode="payment",
                     payment_method_options={
-                        "wechat_pay": {"client": "web"}
+                        "wechat_pay": {
+                            "client": "web"  # 必须指定为网页端
+                        }
                     },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=single",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                st.success(t["payment_link_generated"])
-                col_left, col_right = st.columns([1, 3])  # 调整列宽比例，让按钮更宽
-                with col_left:
-                    st.markdown(t["payment_hint"])
-                with col_right:
-                    # 大红色加粗按钮
-                    button_html = f"""
-                    <a href="{checkout_session.url}" target="_blank" style="display: inline-block; background-color: #FF4B4B; color: white; font-weight: bold; font-size: 18px; padding: 10px 16px; border-radius: 8px; text-decoration: none; text-align: center; width: 100%;">{t["goto_stripe_button"]}</a>
-                    """
-                    st.markdown(button_html, unsafe_allow_html=True)
+                st.success("✅ 支付链接已生成，请点击下方按钮完成支付")
+                st.link_button("前往 Stripe 支付页面", checkout_session.url)
             except Exception as e:
-                st.error(f"创建支付会话失败: {e}" if lang=="zh" else f"Failed to create checkout session: {e}")
+                st.error(f"创建支付会话失败: {e}")
     
     # 100次套餐 (30美元)
     with col2:
@@ -994,30 +974,25 @@ def purchase_dialog():
                     line_items=[{
                         "price_data": {
                             "currency": "cny",
-                            "product_data": {"name": "100次套餐" if lang=="zh" else "100 Credits"},
-                            "unit_amount": 21000,
+                            "product_data": {"name": "100次套餐"},
+                            "unit_amount": 21000,  # 210.00 元
                         },
                         "quantity": 1,
                     }],
                     mode="payment",
                     payment_method_options={
-                        "wechat_pay": {"client": "web"}
+                        "wechat_pay": {
+                            "client": "web"
+                        }
                     },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=100",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                st.success(t["payment_link_generated"])
-                col_left, col_right = st.columns([1, 1])
-                with col_left:
-                    st.markdown(t["payment_hint"])
-                with col_right:
-                    button_html = f"""
-                    <a href="{checkout_session.url}" target="_blank" style="display: inline-block; background-color: #FF4B4B; color: white; font-weight: bold; font-size: 18px; padding: 10px 16px; border-radius: 8px; text-decoration: none; text-align: center; width: 100%;">{t["goto_stripe_button"]}</a>
-                    """
-                    st.markdown(button_html, unsafe_allow_html=True)
+                st.success("✅ 支付链接已生成，请点击下方按钮完成支付")
+                st.link_button("前往 Stripe 支付页面", checkout_session.url)
             except Exception as e:
-                st.error(f"创建支付会话失败: {e}" if lang=="zh" else f"Failed to create checkout session: {e}")
+                st.error(f"创建支付会话失败: {e}")
     
     # 1200次套餐 (200美元)
     with col3:
@@ -1028,34 +1003,29 @@ def purchase_dialog():
                     line_items=[{
                         "price_data": {
                             "currency": "cny",
-                            "product_data": {"name": "1200次套餐" if lang=="zh" else "1200 Credits"},
-                            "unit_amount": 140000,
+                            "product_data": {"name": "1200次套餐"},
+                            "unit_amount": 140000,  # 1400.00 元
                         },
                         "quantity": 1,
                     }],
                     mode="payment",
                     payment_method_options={
-                        "wechat_pay": {"client": "web"}
+                        "wechat_pay": {
+                            "client": "web"
+                        }
                     },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=1200",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                st.success(t["payment_link_generated"])
-                col_left, col_right = st.columns([1, 1])
-                with col_left:
-                    st.markdown(t["payment_hint"])
-                with col_right:
-                    button_html = f"""
-                    <a href="{checkout_session.url}" target="_blank" style="display: inline-block; background-color: #FF4B4B; color: white; font-weight: bold; font-size: 18px; padding: 10px 16px; border-radius: 8px; text-decoration: none; text-align: center; width: 100%;">{t["goto_stripe_button"]}</a>
-                    """
-                    st.markdown(button_html, unsafe_allow_html=True)
+                st.success("✅ 支付链接已生成，请点击下方按钮完成支付")
+                st.link_button("前往 Stripe 支付页面", checkout_session.url)
             except Exception as e:
-                st.error(f"创建支付会话失败: {e}" if lang=="zh" else f"Failed to create checkout session: {e}")
+                st.error(f"创建支付会话失败: {e}")
     
-    st.markdown("#### 🇨🇳 国内支付（支付宝/微信）" if lang=="zh" else "#### 🇨🇳 Domestic Payment (Alipay/WeChat Pay)")
-    st.info("支持支付宝、微信支付和信用卡，支付成功后自动激活授权码。" if lang=="zh" else "Supports Alipay, WeChat Pay, and credit cards. License key will be auto-activated after payment.")
-    st.markdown("支付成功后会自动跳回本页面，授权码将自动激活。" if lang=="zh" else "You will be redirected back after payment, and the license key will be auto-activated.")
+    st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
+    st.info("支持支付宝、微信支付和信用卡，支付成功后自动激活授权码。")
+    st.markdown("支付成功后会自动跳回本页面，授权码将自动激活。")
 
 # ================== 侧边栏 ==================
 with st.sidebar:
@@ -1068,11 +1038,11 @@ with st.sidebar:
     if report_key_input:
         valid, remaining, expiry_str, lic_type = activate_license(report_key_input)
         if valid:
-            st.success(f"授权成功！剩余 {remaining} 次，有效期至 {expiry_str[:10]}" if lang=="zh" else f"Success! {remaining} uses left, valid until {expiry_str[:10]}")
+            st.success(f"授权成功！剩余 {remaining} 次，有效期至 {expiry_str[:10]}")
             st.session_state.current_report_key = report_key_input
         else:
             if report_key_input != st.session_state.current_report_key:
-                st.error("授权码无效或已过期" if lang=="zh" else "Invalid or expired license key")
+                st.error("授权码无效或已过期")
                 st.session_state.current_report_key = ""
                 st.session_state.current_license_type = None
     else:
@@ -1081,18 +1051,18 @@ with st.sidebar:
         else:
             st.error(t["trial_ended"])
     if st.session_state.admin_logged_in:
-        st.info("管理员模式：无限使用" if lang=="zh" else "Admin mode: unlimited usage")
+        st.info("管理员模式：无限使用")
     else:
         remaining_str, expiry_str = get_remaining_info(st.session_state.current_report_key)
         st.markdown(f"**{t['license_info']}**")
         st.write(f"{t['remaining_label']}: {remaining_str}")
-        if expiry_str != "试用剩余次数" and expiry_str != "Trial left":
+        if expiry_str != "试用剩余次数":
             st.write(f"{t['expiry_label']}: {expiry_str}")
     st.markdown("---")
     st.markdown(t["contact_info"])
     st.markdown("---")
     st.markdown(f"## {t['purchase_title']}")
-    if st.button(t["purchase_button"], use_container_width=True):
+    if st.button("💰 购买授权码", use_container_width=True):
         purchase_dialog()
     st.markdown("---")
     st.markdown(f"## {t['sidebar_title']}")
