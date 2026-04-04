@@ -711,7 +711,8 @@ def purchase_dialog():
                     customer_creation="always",
                 )
                 st.success(t["payment_link_generated"])
-                # 使用 st.link_button 直接在新标签页打开，突出显示
+                st.markdown(t["payment_hint"])
+                # 使用 st.link_button 并占满宽度
                 st.link_button(t["goto_stripe_button"], checkout_session.url, use_container_width=True)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}" if lang=="zh" else f"Failed to create checkout session: {e}")
@@ -739,6 +740,7 @@ def purchase_dialog():
                     customer_creation="always",
                 )
                 st.success(t["payment_link_generated"])
+                st.markdown(t["payment_hint"])
                 st.link_button(t["goto_stripe_button"], checkout_session.url, use_container_width=True)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}" if lang=="zh" else f"Failed to create checkout session: {e}")
@@ -766,6 +768,7 @@ def purchase_dialog():
                     customer_creation="always",
                 )
                 st.success(t["payment_link_generated"])
+                st.markdown(t["payment_hint"])
                 st.link_button(t["goto_stripe_button"], checkout_session.url, use_container_width=True)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}" if lang=="zh" else f"Failed to create checkout session: {e}")
@@ -773,7 +776,6 @@ def purchase_dialog():
     st.markdown("#### 🇨🇳 国内支付（支付宝/微信）" if lang=="zh" else "#### 🇨🇳 Domestic Payment (Alipay/WeChat Pay)")
     st.info("支持支付宝、微信支付和信用卡，支付成功后自动激活授权码。" if lang=="zh" else "Supports Alipay, WeChat Pay, and credit cards. License key will be auto-activated after payment.")
     st.markdown("支付成功后会自动跳回本页面，授权码将自动激活。" if lang=="zh" else "You will be redirected back after payment, and the license key will be auto-activated.")
-
 # ================== 侧边栏 ==================
 with st.sidebar:
     report_key_input = st.text_input(
