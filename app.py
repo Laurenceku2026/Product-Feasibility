@@ -1147,8 +1147,6 @@ with st.sidebar:
         if expiry_str != "试用剩余次数" and expiry_str != "Trial left":
             st.write(f"{t['expiry_label']}: {expiry_str}")
     st.markdown("---")
-    st.markdown(t["contact_info"])
-    st.markdown("---")
     st.markdown(f"## {t['purchase_title']}")
     if st.button(t["purchase_button"], use_container_width=True):
         purchase_dialog()
@@ -1172,6 +1170,8 @@ with st.sidebar:
         st.success(t["api_configured"])
     else:
         st.error(t["api_not_configured"])
+    st.markdown("---")
+    st.markdown(t["contact_info"])  # 将联系信息移到侧边栏最底部
 
 # ================== 主表单 ==================
 st.markdown(f"### {t['input_title']}")
