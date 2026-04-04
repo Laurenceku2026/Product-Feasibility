@@ -590,7 +590,7 @@ TEXTS = {
 2. 对于用户选择的每一个目标市场（例如中国大陆、美国等），都需要分别进行市场规模与趋势、用户画像、竞品分析、渠道结构的分析。**不能只笼统地写一个综合表格，而是按市场分别列出**。
 3. 用户痛点分析必须基于真实场景，并**从痛点中提炼出具体的技术参数要求**（例如：从“清洗困难”提炼出“易拆洗、无死角、可洗碗机清洗”等具体设计指标）。
 4. 竞品分析要针对每个目标市场列出该市场的主要竞品（至少3个），并对比功能、定价、优势劣势。
-5. 技术可行性评估中的“关键技术要求”必须与前面提炼的用户痛点直接关联，明确写出对应的技术指标（如噪音≤30dB、出粮精度误差<5%、材质为食品级不锈钢等）。
+5. 技术可行性评估中的“关键技术要求”必须与前面提炼的用户痛点直接关联，明确写出对应的技术指标（如噪音≤30dB、出粮精度误差<5%、材质为食品级不锈钢等），**并且要充分利用用户提供的“相关技术经验”和“预估研发预算”来评估客户现有能力和资源匹配度**。
 6. 所有表格必须包含具体数据（金额、百分比、评分等），不得留空或仅写“待补充”。
 
 # 《产品可行性分析报告》
@@ -606,6 +606,8 @@ TEXTS = {
 | 产品描述 | {product_description} |
 | 目标市场 | {target_markets} |
 | 目标用户 | {target_users} |
+| 相关技术经验 | {tech_experience} |
+| 预估研发预算 | {estimated_budget} |
 | 报告日期 | {{CURRENT_DATE}} |
 | 分析人 | {{ANALYST_INFO}} |
 
@@ -667,7 +669,7 @@ TEXTS = {
 
 ### 4.1 关键技术要求
 
-**必须与第一部分提炼的用户痛点直接挂钩**，用表格列出：关键技术项、对应的痛点、具体技术要求（含量化指标）、客户现有能力、风险评估（高/中/低）。例如：痛点“清洗困难” → 技术项“模块化快拆结构” → 要求“拆解步骤≤3步，可进洗碗机”。
+**必须与第一部分提炼的用户痛点直接挂钩，并充分利用用户提供的“相关技术经验”和“预估研发预算”**。用表格列出：关键技术项、对应的痛点、具体技术要求（含量化指标）、客户现有能力（基于用户输入的{tech_experience}）、风险评估（高/中/低）。同时，评估用户预算{estimated_budget}是否能支持所需研发投入，给出建议。
 
 ### 4.2 开发周期估算
 
@@ -789,7 +791,7 @@ You are a senior product analyst and R&D consultant with 25 years of experience 
 2. For each target market selected by the user (e.g., Mainland China, USA), you must provide separate analysis for market size & trends, user persona, competitor analysis, and channel structure. **Do not write a single combined table; break down by market**.
 3. User pain points must be based on real scenarios, and **from each pain point, derive specific technical parameter requirements** (e.g., pain point "difficult to clean" → technical requirement "fully detachable structure, no dead corners, dishwasher-safe").
 4. Competitor analysis must list at least 3 main competitors per target market, comparing features, pricing, strengths, and weaknesses.
-5. The "Key Technical Requirements" in Part 4 must be directly linked to the pain points identified earlier, specifying quantitative metrics (e.g., noise ≤30dB, feeding accuracy error <5%, food-grade stainless steel).
+5. The "Key Technical Requirements" in Part 4 must be directly linked to the pain points identified earlier, specifying quantitative metrics (e.g., noise ≤30dB, feeding accuracy error <5%, food-grade stainless steel), **and must fully utilize the user's provided "Relevant Tech Experience" and "Estimated R&D Budget" to assess the client's capability and resource fit**.
 6. All tables must contain concrete data (amounts, percentages, scores, etc.) – never leave cells empty or write "to be added".
 
 # Product Feasibility Analysis Report
@@ -805,6 +807,8 @@ You are a senior product analyst and R&D consultant with 25 years of experience 
 | Product Description | {product_description} |
 | Target Markets | {target_markets} |
 | Target Users | {target_users} |
+| Relevant Tech Experience | {tech_experience} |
+| Estimated R&D Budget | {estimated_budget} |
 | Report Date | {{CURRENT_DATE}} |
 | Analyst | {{ANALYST_INFO}} |
 
@@ -866,7 +870,7 @@ Provide channel expansion recommendations by year in a table: phase, market, cha
 
 ### 4.1 Key Technical Requirements
 
-**Must directly map to pain points from Part 1.** Use a table with: technology item, corresponding pain point, specific technical requirement (quantified), client capability, risk level (High/Medium/Low). Example: pain point "hard to clean" → technology "modular quick-release" → requirement "≤3 steps to disassemble, dishwasher-safe".
+**Must directly map to pain points from Part 1, and fully utilize the user's "Relevant Tech Experience" and "Estimated R&D Budget".** Use a table with: technology item, corresponding pain point, specific technical requirement (quantified), client capability (based on user's {tech_experience}), risk level (High/Medium/Low). Also assess whether the {estimated_budget} is sufficient for required R&D, and provide recommendations.
 
 ### 4.2 Development Timeline Estimate
 
@@ -1291,7 +1295,9 @@ if submitted:
                             target_users=target_users or "未提供",
                             channel_status=channel_status,
                             channel_detail=channel_detail or "未提供",
-                            brand_status=brand_status
+                            brand_status=brand_status,
+                            tech_experience=tech_experience if tech_experience else "未提供",
+                            estimated_budget=estimated_budget if estimated_budget else "未提供"
                         )
                         response = client.chat.completions.create(
                             model=st.session_state.ai_model_name,
