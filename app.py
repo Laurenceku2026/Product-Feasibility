@@ -1015,7 +1015,7 @@ def purchase_dialog():
 | 100 Credits | 180 RMB / $30 | 100 uses | 1 month |
 | 1200 Credits | 1200 RMB / $200 | 1200 uses | 12 months |
 """)
-    st.markdown("#### 🌍 国际支付（Stripe）" if lang=="zh" else "#### 🌍 International Payment (Stripe)")
+    st.markdown("#### 💳 银行卡支付（Stripe）" if lang=="zh" else "#### 💳 Card Payment (Stripe)")
     
     if not stripe.api_key:
         st.error("Stripe 未配置，请联系管理员。" if lang=="zh" else "Stripe not configured. Please contact admin.")
