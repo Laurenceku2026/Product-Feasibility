@@ -214,6 +214,11 @@ def add_security_css(disable=False):
         th, td {
             padding: 6px;
         }
+        /* 让支付按钮更突出 */
+        .stButton button {
+            font-weight: bold !important;
+            font-size: 18px !important;
+        }
     </style>
     <div class="bg-watermark"></div>
     <script>
@@ -508,6 +513,7 @@ TEXTS = {
         "no_license": "未输入授权码，当前为试用模式（剩余次数：{}）",
         "trial_warning": "⚠️ 您还有 {} 次试用机会，输入授权码可解锁无限使用和下载功能。",
         "payment_link_generated": "✅ 支付链接已生成，请点击下方按钮完成支付",
+        "payment_hint": "",   # 可以留空，因为提示已经在上面的 success 中包含了
         "report_prompt": """
 你是一位资深产品分析师和研发顾问，拥有25年消费电子及智能硬件行业经验。请根据以下产品信息，生成一份专业的《产品可行性分析报告》。
 
@@ -706,6 +712,7 @@ TEXTS = {
         "no_license": "No Report Key entered. Trial mode (remaining credits: {})",
         "trial_warning": "⚠️ You have {} trial credits left. Enter a license key to unlock unlimited usage and download.",
         "payment_link_generated": "✅ Payment link generated. Click the button below to pay.",
+        "payment_hint": "",
         "report_prompt": """
 You are a senior product analyst and R&D consultant with 25 years of experience in consumer electronics and smart hardware. Based on the following product information, generate a professional "Product Feasibility Analysis Report".
 
@@ -971,7 +978,7 @@ def purchase_dialog():
                     customer_creation="always",
                 )
                 st.success(t["payment_link_generated"])
-                # 使用 link_button 并占满宽度，自动加粗突出
+                # 使用红色加粗按钮，占满整行
                 st.link_button(t["goto_stripe_button"], checkout_session.url, use_container_width=True)
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}" if lang=="zh" else f"Failed to create checkout session: {e}")
