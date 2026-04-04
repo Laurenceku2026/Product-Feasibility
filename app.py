@@ -973,7 +973,7 @@ def purchase_dialog():
         if st.button("🎟️ Single Pass\n$3", use_container_width=True):
             try:
                 checkout_session = stripe.checkout.Session.create(
-                    payment_method_types=["card", "alipay", "wechat_pay"],
+                    payment_method_types=["card"],
                     line_items=[{
                         "price_data": {
                             "currency": "cny",
