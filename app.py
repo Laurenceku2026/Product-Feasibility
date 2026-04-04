@@ -214,22 +214,6 @@ def add_security_css(disable=False):
         th, td {
             padding: 6px;
         }
-        /* 自定义支付按钮样式 */
-        .big-pay-button a {
-            display: inline-block;
-            background-color: #FF4B4B !important;
-            color: white !important;
-            font-weight: bold !important;
-            font-size: 18px !important;
-            padding: 10px 20px !important;
-            border-radius: 8px !important;
-            text-align: center;
-            text-decoration: none;
-            width: 100%;
-        }
-        .big-pay-button a:hover {
-            background-color: #FF0000 !important;
-        }
     </style>
     <div class="bg-watermark"></div>
     <script>
@@ -942,7 +926,7 @@ if "order_success" in params and "plan" in params:
         st.query_params.clear()
 
 # ================== 购买对话框 ==================
-@st.dialog("购买+解锁" if lang=="zh" else "Purchase + Unlock")
+@st.dialog("购买+解锁" if lang=="zh" else "Purchase + Unlock", width="large")
 def purchase_dialog():
     st.markdown("### 选择套餐" if lang=="zh" else "### Select Plan")
     st.markdown("""
@@ -988,15 +972,14 @@ def purchase_dialog():
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                # 使用两列布局，将提示和按钮放在同一行，按钮加粗突出
                 st.success(t["payment_link_generated"])
-                col_left, col_right = st.columns([2, 1])
+                col_left, col_right = st.columns([1, 1])  # 调整列宽比例，让按钮更宽
                 with col_left:
                     st.markdown(t["payment_hint"])
                 with col_right:
-                    # 自定义大按钮样式
+                    # 大红色加粗按钮
                     button_html = f"""
-                    <a href="{checkout_session.url}" target="_blank" style="display: inline-block; background-color: #FF4B4B; color: white; font-weight: bold; font-size: 18px; padding: 10px 20px; border-radius: 8px; text-decoration: none; text-align: center; width: 100%;">{t["goto_stripe_button"]}</a>
+                    <a href="{checkout_session.url}" target="_blank" style="display: inline-block; background-color: #FF4B4B; color: white; font-weight: bold; font-size: 18px; padding: 10px 16px; border-radius: 8px; text-decoration: none; text-align: center; width: 100%;">{t["goto_stripe_button"]}</a>
                     """
                     st.markdown(button_html, unsafe_allow_html=True)
             except Exception as e:
@@ -1025,12 +1008,12 @@ def purchase_dialog():
                     customer_creation="always",
                 )
                 st.success(t["payment_link_generated"])
-                col_left, col_right = st.columns([2, 1])
+                col_left, col_right = st.columns([1, 1])
                 with col_left:
                     st.markdown(t["payment_hint"])
                 with col_right:
                     button_html = f"""
-                    <a href="{checkout_session.url}" target="_blank" style="display: inline-block; background-color: #FF4B4B; color: white; font-weight: bold; font-size: 18px; padding: 10px 20px; border-radius: 8px; text-decoration: none; text-align: center; width: 100%;">{t["goto_stripe_button"]}</a>
+                    <a href="{checkout_session.url}" target="_blank" style="display: inline-block; background-color: #FF4B4B; color: white; font-weight: bold; font-size: 18px; padding: 10px 16px; border-radius: 8px; text-decoration: none; text-align: center; width: 100%;">{t["goto_stripe_button"]}</a>
                     """
                     st.markdown(button_html, unsafe_allow_html=True)
             except Exception as e:
@@ -1059,12 +1042,12 @@ def purchase_dialog():
                     customer_creation="always",
                 )
                 st.success(t["payment_link_generated"])
-                col_left, col_right = st.columns([2, 1])
+                col_left, col_right = st.columns([1, 1])
                 with col_left:
                     st.markdown(t["payment_hint"])
                 with col_right:
                     button_html = f"""
-                    <a href="{checkout_session.url}" target="_blank" style="display: inline-block; background-color: #FF4B4B; color: white; font-weight: bold; font-size: 18px; padding: 10px 20px; border-radius: 8px; text-decoration: none; text-align: center; width: 100%;">{t["goto_stripe_button"]}</a>
+                    <a href="{checkout_session.url}" target="_blank" style="display: inline-block; background-color: #FF4B4B; color: white; font-weight: bold; font-size: 18px; padding: 10px 16px; border-radius: 8px; text-decoration: none; text-align: center; width: 100%;">{t["goto_stripe_button"]}</a>
                     """
                     st.markdown(button_html, unsafe_allow_html=True)
             except Exception as e:
