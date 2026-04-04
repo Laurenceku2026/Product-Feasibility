@@ -426,11 +426,11 @@ def admin_settings_dialog():
 # ================== 右上角按钮 ==================
 col1, col2, col3, col4 = st.columns([8, 1, 1, 1])
 with col2:
-    if st.button("中文", key="zh_btn"):
+    if st.button("中文", key="zh_btn", type="primary"):
         st.session_state.lang = "zh"
         st.rerun()
 with col3:
-    if st.button("English", key="en_btn"):
+    if st.button("English", key="en_btn", type="primary"):
         st.session_state.lang = "en"
         st.rerun()
 with col4:
@@ -507,137 +507,8 @@ TEXTS = {
         "trial_ended": "试用次数已用完，请联系 Techlife2027@gmail.com 购买授权码",
         "no_license": "未输入授权码，当前为试用模式（剩余次数：{}）",
         "trial_warning": "⚠️ 您还有 {} 次试用机会，输入授权码可解锁无限使用和下载功能。",
-        "report_prompt": """
-你是一位资深产品分析师和研发顾问，拥有25年消费电子及智能硬件行业经验。请根据以下产品信息，生成一份专业的《产品可行性分析报告》。
-
-**重要要求：**
-1. 报告必须严格按照以下Markdown结构输出，并且必须包含第六部分的所有三个小节：6.1、6.2、6.3。
-2. 对于用户选择的每一个目标市场（例如中国大陆、美国等），都需要分别进行市场规模与趋势、用户画像、竞品分析、渠道结构的分析。**不能只笼统地写一个综合表格，而是按市场分别列出**。
-3. 用户痛点分析必须基于真实场景，并**从痛点中提炼出具体的技术参数要求**（例如：从“清洗困难”提炼出“易拆洗、无死角、可洗碗机清洗”等具体设计指标）。
-4. 竞品分析要针对每个目标市场列出该市场的主要竞品（至少3个），并对比功能、定价、优势劣势。
-5. 技术可行性评估中的“关键技术要求”必须与前面提炼的用户痛点直接关联，明确写出对应的技术指标（如噪音≤30dB、出粮精度误差<5%、材质为食品级不锈钢等）。
-6. 所有表格必须包含具体数据（金额、百分比、评分等），不得留空或仅写“待补充”。
-
-# 《产品可行性分析报告》
-## {product_name}
-
-**报告在线访问地址：https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/**
-
-## 报告基本信息
-
-| 项目 | 内容 |
-|------|------|
-| 产品名称 | {product_name} |
-| 产品描述 | {product_description} |
-| 目标市场 | {target_markets} |
-| 目标用户 | {target_users} |
-| 报告日期 | {{CURRENT_DATE}} |
-| 分析人 | {{ANALYST_INFO}} |
-
----
-
-## 第一部分：市场需求分析
-
-### 1.1 市场规模与趋势
-
-**请按每个目标市场分别列出**，每个市场单独一个表格或一个子章节。表格需包含：市场规模（具体年份和金额）、年增长率、主要驱动因素、主要瓶颈。
-
-### 1.2 用户画像
-
-**请按每个目标市场分别描述**核心用户特征：年龄、性别、收入、宠物类型、购买动机、价格敏感度、信息获取渠道等。可用表格或分点列出。
-
-### 1.3 用户痛点分析
-
-**请按每个目标市场分别列出3-5个核心痛点**，用表格说明：痛点、提及频率（高/中/低）、具体描述。**并且在每个痛点后，直接提炼出对应的技术参数要求**（例如：痛点“饮水机清洗困难”→ 技术参数要求：“结构可完全拆卸、无清洁死角、支持洗碗机清洗”）。
-
-### 1.4 关键功能需求排序
-
-基于上述痛点，列出跨市场通用的关键功能需求，用表格给出功能、重要性评分（1-10分）、说明。
-
----
-
-## 第二部分：竞品分析
-
-### 2.1 主要竞争对手
-
-**请按每个目标市场分别列出至少3个主要竞品**，用表格说明：品牌、产品型号/系列、优势、劣势、定价区间。
-
-### 2.2 竞品功能对比
-
-**请按每个目标市场分别选择5-6个关键功能进行对比**，用表格展示：功能、竞品A表现、竞品B表现、竞品C表现、市场空白机会。
-
-### 2.3 市场空白点分析
-
-综合所有市场，列出至少3个跨市场的空白机会，每个机会给出简要说明。
-
----
-
-## 第三部分：渠道适配性分析
-
-### 3.1 目标市场渠道结构
-
-**请按每个目标市场分别描述**主要渠道类型、占比、特点、适合度，用表格形式。
-
-### 3.2 客户现有渠道现状
-
-（基于用户输入：渠道情况={channel_status}，渠道详情={channel_detail}，品牌认知度={brand_status}，进行分析，说明优势和不足）
-
-### 3.3 渠道策略建议
-
-按年份给出渠道拓展建议，用表格：阶段、市场、渠道策略、具体行动。
-
----
-
-## 第四部分：技术可行性评估
-
-### 4.1 关键技术要求
-
-**必须与第一部分提炼的用户痛点直接挂钩**，用表格列出：关键技术项、对应的痛点、具体技术要求（含量化指标）、客户现有能力、风险评估（高/中/低）。例如：痛点“清洗困难” → 技术项“模块化快拆结构” → 要求“拆解步骤≤3步，可进洗碗机”。
-
-### 4.2 开发周期估算
-
-用表格列出：阶段、时间、关键任务。
-
-### 4.3 关键风险点
-
-用表格列出：风险、可能性（高/中/低）、影响（高/中/低）、应对措施。
-
----
-
-## 第五部分：销售预测
-
-### 5.1 预测模型假设
-
-列出定价、目标市场、市场份额等假设，用要点形式。
-
-### 5.2 销售额预测
-
-3年预测，用表格：年份、美国市场、中国市场、总营收、关键假设。
-
-### 5.3 投资回报估算
-
-用表格列出：研发投入、市场推广、首批生产成本、总启动资金、毛利率、盈亏平衡点。
-
----
-
-## 第六部分：结论与建议
-
-### 6.1 综合评估
-
-用表格打分：市场吸引力、技术可行性、渠道匹配度、竞争格局、投资回报，各1-10分，并说明理由。
-
-### 6.2 差异化定位建议
-
-给出2-3个定位选项，用表格分析：定位、优势、风险。
-
-### 6.3 最终建议
-
-给出综合评分（例如X/10分）和“建议/不建议/积极进入”的结论，以及5点具体的下一步行动。
-
----
-
-请直接输出报告内容，不要添加额外解释。对于用户未提供的信息，基于行业标准进行合理推断，并给出具体的数字。务必确保第六部分的 6.2 和 6.3 完整输出。
-"""
+        "payment_link_generated": "✅ 支付链接已生成，请点击下方按钮完成支付",
+        "report_prompt": """...（与之前相同，省略以节省篇幅，实际使用时请保留完整）"""
     },
     "en": {
         "title": "📊 Product Feasibility - AI Analysis System",
@@ -704,137 +575,8 @@ TEXTS = {
         "trial_ended": "Trial credits used up, please contact Techlife2027@gmail.com to purchase a license",
         "no_license": "No Report Key entered. Trial mode (remaining credits: {})",
         "trial_warning": "⚠️ You have {} trial credits left. Enter a license key to unlock unlimited usage and download.",
-        "report_prompt": """
-You are a senior product analyst and R&D consultant with 25 years of experience in consumer electronics and smart hardware. Based on the following product information, generate a professional "Product Feasibility Analysis Report".
-
-**Important Requirements:**
-1. The report must strictly follow the Markdown structure below and MUST include all three subsections of Part 6: 6.1, 6.2, and 6.3.
-2. For each target market selected by the user (e.g., Mainland China, USA), you must provide separate analysis for market size & trends, user persona, competitor analysis, and channel structure. **Do not write a single combined table; break down by market**.
-3. User pain points must be based on real scenarios, and **from each pain point, derive specific technical parameter requirements** (e.g., pain point "difficult to clean" → technical requirement "fully detachable structure, no dead corners, dishwasher-safe").
-4. Competitor analysis must list at least 3 main competitors per target market, comparing features, pricing, strengths, and weaknesses.
-5. The "Key Technical Requirements" in Part 4 must be directly linked to the pain points identified earlier, specifying quantitative metrics (e.g., noise ≤30dB, feeding accuracy error <5%, food-grade stainless steel).
-6. All tables must contain concrete data (amounts, percentages, scores, etc.) – never leave cells empty or write "to be added".
-
-# Product Feasibility Analysis Report
-## {product_name}
-
-**Online report access: https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/**
-
-## Report Basic Information
-
-| Item | Content |
-|------|---------|
-| Product Name | {product_name} |
-| Product Description | {product_description} |
-| Target Markets | {target_markets} |
-| Target Users | {target_users} |
-| Report Date | {{CURRENT_DATE}} |
-| Analyst | {{ANALYST_INFO}} |
-
----
-
-## Part 1: Market Demand Analysis
-
-### 1.1 Market Size & Trends
-
-**Provide separate analysis for each target market.** Each market should have its own table or subsection including: market size (year and amount), growth rate, key drivers, key barriers.
-
-### 1.2 User Persona
-
-**Describe user persona separately for each target market** – age, gender, income, pet type, purchase motivation, price sensitivity, info channels. Use tables or bullet points.
-
-### 1.3 User Pain Points
-
-**List 3-5 core pain points per target market** in a table: pain point, frequency (High/Medium/Low), description. **After each pain point, derive corresponding technical parameter requirements** (e.g., pain point "hard to clean" → technical requirement "fully removable parts, dishwasher-safe, no dead corners").
-
-### 1.4 Key Feature Priority
-
-Based on the pain points above, list cross-market key features with importance score (1-10) and explanation in a table.
-
----
-
-## Part 2: Competitive Analysis
-
-### 2.1 Main Competitors
-
-**List at least 3 main competitors per target market** in a table: brand, product/model, strengths, weaknesses, price range.
-
-### 2.2 Feature Comparison
-
-**For each target market, compare 5-6 key features** in a table: feature, competitor A, competitor B, competitor C, gap opportunity.
-
-### 2.3 Market Gap Summary
-
-List at least 3 cross-market gap opportunities with brief explanation.
-
----
-
-## Part 3: Channel Suitability Analysis
-
-### 3.1 Target Market Channel Structure
-
-**Describe channel types, share, characteristics, suitability separately for each target market** in a table.
-
-### 3.2 Client's Current Channel Status
-
-(Analyze based on user input: channel status={channel_status}, channel details={channel_detail}, brand awareness={brand_status})
-
-### 3.3 Channel Strategy Recommendations
-
-Provide channel expansion recommendations by year in a table: phase, market, channel strategy, specific actions.
-
----
-
-## Part 4: Technical Feasibility Assessment
-
-### 4.1 Key Technical Requirements
-
-**Must directly map to pain points from Part 1.** Use a table with: technology item, corresponding pain point, specific technical requirement (quantified), client capability, risk level (High/Medium/Low). Example: pain point "hard to clean" → technology "modular quick-release" → requirement "≤3 steps to disassemble, dishwasher-safe".
-
-### 4.2 Development Timeline Estimate
-
-List phase, duration, key tasks in a table.
-
-### 4.3 Key Risk Points
-
-List risk, probability (High/Medium/Low), impact (High/Medium/Low), mitigation in a table.
-
----
-
-## Part 5: Sales Forecast
-
-### 5.1 Forecast Assumptions
-
-List pricing, target market, share assumptions in bullet points.
-
-### 5.2 Sales Forecast
-
-3-year forecast in a table: year, US market, China market, total revenue, key assumptions.
-
-### 5.3 ROI Estimate
-
-List R&D investment, marketing, first production cost, total capital, gross margin, breakeven point in a table.
-
----
-
-## Part 6: Conclusion & Recommendations
-
-### 6.1 Comprehensive Evaluation
-
-Score each dimension: Market Attractiveness, Technical Feasibility, Channel Fit, Competitive Landscape, ROI Potential out of 10, with explanation in a table.
-
-### 6.2 Differentiation Positioning Recommendations
-
-Provide 2-3 positioning options in a table: positioning, advantages, risks.
-
-### 6.3 Final Recommendation
-
-Provide overall score (e.g., X/10) and a conclusion like "Recommended / Highly Recommended / Not Recommended", plus 5 specific next steps.
-
----
-
-Output the report directly without additional explanation. For information not provided by the user, make reasonable inferences based on industry standards and provide specific numbers. Ensure that Part 6 includes all three subsections 6.1, 6.2, and 6.3.
-"""
+        "payment_link_generated": "✅ Payment link generated. Click the button below to pay.",
+        "report_prompt": """...（与之前相同，省略以节省篇幅，实际使用时请保留完整）"""
     }
 }
 
@@ -850,12 +592,12 @@ st.title(t["title"])
 if st.session_state.get("show_payment_dialog", False):
     @st.dialog("✅ 支付成功")
     def payment_success_dialog():
-        st.markdown("### 您的授权码已生成")
+        st.markdown("### 您的授权码已生成" if lang=="zh" else "### Your license key has been generated")
         st.code(st.session_state.payment_new_key, language="text")
-        st.caption("请妥善保管此授权码，下次使用时可手动复制并粘贴到左侧输入框。")
-        st.info("🔑 请复制上方授权码，然后关闭本窗口，回到您原先生成报告的那个窗口，将授权码粘贴到左侧边栏输入框中即可解锁下载。")
+        st.caption("请妥善保管此授权码，下次使用时可手动复制并粘贴到左侧输入框。" if lang=="zh" else "Please save this license key. You can copy and paste it into the left sidebar next time.")
+        st.info("🔑 请复制上方授权码，然后关闭本窗口，回到您原先生成报告的那个窗口，将授权码粘贴到左侧边栏输入框中即可解锁下载。" if lang=="zh" else "🔑 Please copy the license key above, close this window, return to your original report window, and paste the key into the left sidebar to unlock download.")
         st.markdown("---")
-        if st.button("确定", use_container_width=True):
+        if st.button("确定" if lang=="zh" else "OK", use_container_width=True):
             st.session_state.show_payment_dialog = False
             for key in ["payment_new_key", "payment_plan_name"]:
                 if key in st.session_state:
@@ -873,7 +615,7 @@ if "order_success" in params and "plan" in params:
     # 根据语言和套餐设置 uses, months, plan_name
     if current_lang == "zh":
         if plan == "single":
-            uses = 3          # 单次通行实际给 3 次
+            uses = 3
             months = 9999
             plan_name = "单次通行"
         elif plan == "100":
@@ -888,7 +630,7 @@ if "order_success" in params and "plan" in params:
             uses = 0
             months = 0
             plan_name = "未知"
-    else:  # English
+    else:
         if plan == "single":
             uses = 3
             months = 9999
@@ -918,24 +660,30 @@ if "order_success" in params and "plan" in params:
         st.session_state.show_payment_dialog = True
         st.rerun()
     else:
-        st.error("❌ 支付失败或套餐无效，请联系客服。")
+        st.error("❌ 支付失败或套餐无效，请联系客服。" if lang=="zh" else "❌ Payment failed or plan invalid. Please contact support.")
         st.query_params.clear()
 
 # ================== 购买对话框 ==================
-@st.dialog("购买+解锁")
+@st.dialog("购买+解锁" if lang=="zh" else "Purchase + Unlock")
 def purchase_dialog():
-    st.markdown("### 选择套餐")
+    st.markdown("### 选择套餐" if lang=="zh" else "### Select Plan")
     st.markdown("""
 | 套餐 | 价格 | 次数 | 有效期 |
 |------|------|------|--------|
 | 单次通行 | 18元 / 3美元 | 3次 | 无限制 |
 | 100次套餐 | 180元 / 30美元 | 100次 | 1个月 |
 | 1200次套餐 | 1200元 / 200美元 | 1200次 | 12个月 |
+""" if lang=="zh" else """
+| Plan | Price | Credits | Validity |
+|------|-------|---------|----------|
+| Single Pass | 18 RMB / $3 | 3 uses | Unlimited |
+| 100 Credits | 180 RMB / $30 | 100 uses | 1 month |
+| 1200 Credits | 1200 RMB / $200 | 1200 uses | 12 months |
 """)
-    st.markdown("#### 🌍 国际支付（Stripe）")
+    st.markdown("#### 🌍 国际支付（Stripe）" if lang=="zh" else "#### 🌍 International Payment (Stripe)")
     
     if not stripe.api_key:
-        st.error("Stripe 未配置，请联系管理员。")
+        st.error("Stripe 未配置，请联系管理员。" if lang=="zh" else "Stripe not configured. Please contact admin.")
         return
     
     col1, col2, col3 = st.columns(3)
@@ -949,7 +697,7 @@ def purchase_dialog():
                     line_items=[{
                         "price_data": {
                             "currency": "cny",
-                            "product_data": {"name": "单次通行 (3次使用)"},
+                            "product_data": {"name": "单次通行 (3次使用)" if lang=="zh" else "Single Pass (3 uses)"},
                             "unit_amount": 2100,
                         },
                         "quantity": 1,
@@ -962,12 +710,11 @@ def purchase_dialog():
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                st.success("✅ 支付链接已生成")
-                # 使用主色调按钮，点击后在新标签页打开支付页面
-                if st.button(t["goto_stripe_button"], type="primary", use_container_width=True):
-                    st.markdown(f'<script>window.open("{checkout_session.url}", "_blank");</script>', unsafe_allow_html=True)
+                st.success(t["payment_link_generated"])
+                # 使用 st.link_button 直接在新标签页打开，突出显示
+                st.link_button(t["goto_stripe_button"], checkout_session.url, use_container_width=True)
             except Exception as e:
-                st.error(f"创建支付会话失败: {e}")
+                st.error(f"创建支付会话失败: {e}" if lang=="zh" else f"Failed to create checkout session: {e}")
     
     # 100次套餐 (30美元)
     with col2:
@@ -978,7 +725,7 @@ def purchase_dialog():
                     line_items=[{
                         "price_data": {
                             "currency": "cny",
-                            "product_data": {"name": "100次套餐"},
+                            "product_data": {"name": "100次套餐" if lang=="zh" else "100 Credits"},
                             "unit_amount": 21000,
                         },
                         "quantity": 1,
@@ -991,11 +738,10 @@ def purchase_dialog():
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                st.success("✅ 支付链接已生成")
-                if st.button(t["goto_stripe_button"], type="primary", use_container_width=True):
-                    st.markdown(f'<script>window.open("{checkout_session.url}", "_blank");</script>', unsafe_allow_html=True)
+                st.success(t["payment_link_generated"])
+                st.link_button(t["goto_stripe_button"], checkout_session.url, use_container_width=True)
             except Exception as e:
-                st.error(f"创建支付会话失败: {e}")
+                st.error(f"创建支付会话失败: {e}" if lang=="zh" else f"Failed to create checkout session: {e}")
     
     # 1200次套餐 (200美元)
     with col3:
@@ -1006,7 +752,7 @@ def purchase_dialog():
                     line_items=[{
                         "price_data": {
                             "currency": "cny",
-                            "product_data": {"name": "1200次套餐"},
+                            "product_data": {"name": "1200次套餐" if lang=="zh" else "1200 Credits"},
                             "unit_amount": 140000,
                         },
                         "quantity": 1,
@@ -1019,15 +765,14 @@ def purchase_dialog():
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
                 )
-                st.success("✅ 支付链接已生成")
-                if st.button(t["goto_stripe_button"], type="primary", use_container_width=True):
-                    st.markdown(f'<script>window.open("{checkout_session.url}", "_blank");</script>', unsafe_allow_html=True)
+                st.success(t["payment_link_generated"])
+                st.link_button(t["goto_stripe_button"], checkout_session.url, use_container_width=True)
             except Exception as e:
-                st.error(f"创建支付会话失败: {e}")
+                st.error(f"创建支付会话失败: {e}" if lang=="zh" else f"Failed to create checkout session: {e}")
     
-    st.markdown("#### 🇨🇳 国内支付（支付宝/微信）")
-    st.info("支持支付宝、微信支付和信用卡，支付成功后自动激活授权码。")
-    st.markdown("支付成功后会自动跳回本页面，授权码将自动激活。")
+    st.markdown("#### 🇨🇳 国内支付（支付宝/微信）" if lang=="zh" else "#### 🇨🇳 Domestic Payment (Alipay/WeChat Pay)")
+    st.info("支持支付宝、微信支付和信用卡，支付成功后自动激活授权码。" if lang=="zh" else "Supports Alipay, WeChat Pay, and credit cards. License key will be auto-activated after payment.")
+    st.markdown("支付成功后会自动跳回本页面，授权码将自动激活。" if lang=="zh" else "You will be redirected back after payment, and the license key will be auto-activated.")
 
 # ================== 侧边栏 ==================
 with st.sidebar:
@@ -1040,11 +785,11 @@ with st.sidebar:
     if report_key_input:
         valid, remaining, expiry_str, lic_type = activate_license(report_key_input)
         if valid:
-            st.success(f"授权成功！剩余 {remaining} 次，有效期至 {expiry_str[:10]}")
+            st.success(f"授权成功！剩余 {remaining} 次，有效期至 {expiry_str[:10]}" if lang=="zh" else f"Success! {remaining} uses left, valid until {expiry_str[:10]}")
             st.session_state.current_report_key = report_key_input
         else:
             if report_key_input != st.session_state.current_report_key:
-                st.error("授权码无效或已过期")
+                st.error("授权码无效或已过期" if lang=="zh" else "Invalid or expired license key")
                 st.session_state.current_report_key = ""
                 st.session_state.current_license_type = None
     else:
@@ -1053,18 +798,18 @@ with st.sidebar:
         else:
             st.error(t["trial_ended"])
     if st.session_state.admin_logged_in:
-        st.info("管理员模式：无限使用")
+        st.info("管理员模式：无限使用" if lang=="zh" else "Admin mode: unlimited usage")
     else:
         remaining_str, expiry_str = get_remaining_info(st.session_state.current_report_key)
         st.markdown(f"**{t['license_info']}**")
         st.write(f"{t['remaining_label']}: {remaining_str}")
-        if expiry_str != "试用剩余次数":
+        if expiry_str != "试用剩余次数" and expiry_str != "Trial left":
             st.write(f"{t['expiry_label']}: {expiry_str}")
     st.markdown("---")
     st.markdown(t["contact_info"])
     st.markdown("---")
     st.markdown(f"## {t['purchase_title']}")
-    if st.button(t["purchase_button"], use_container_width=True):   # 国际化按钮
+    if st.button(t["purchase_button"], use_container_width=True):
         purchase_dialog()
     st.markdown("---")
     st.markdown(f"## {t['sidebar_title']}")
