@@ -1028,7 +1028,7 @@ def purchase_dialog():
         if st.button("🎟️ Single Pass\n$3", use_container_width=True):
             try:
                 checkout_session = stripe.checkout.Session.create(
-                    payment_method_types=["card"],
+                    payment_method_types=["card", "wechat_pay"],  # 支持信用卡和微信支付
                     line_items=[{
                         "price_data": {
                             "currency": "usd",
@@ -1038,6 +1038,9 @@ def purchase_dialog():
                         "quantity": 1,
                     }],
                     mode="payment",
+                    payment_method_options={
+                        "wechat_pay": {"client": "web"}  # 微信支付必须指定 web 环境
+                    },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=single",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
@@ -1053,7 +1056,7 @@ def purchase_dialog():
         if st.button("📦 100 Credits\n$30", use_container_width=True):
             try:
                 checkout_session = stripe.checkout.Session.create(
-                    payment_method_types=["card"],
+                    payment_method_types=["card", "wechat_pay"],
                     line_items=[{
                         "price_data": {
                             "currency": "usd",
@@ -1063,6 +1066,9 @@ def purchase_dialog():
                         "quantity": 1,
                     }],
                     mode="payment",
+                    payment_method_options={
+                        "wechat_pay": {"client": "web"}
+                    },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=100",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
@@ -1078,7 +1084,7 @@ def purchase_dialog():
         if st.button("🚀 1200 Credits\n$200", use_container_width=True):
             try:
                 checkout_session = stripe.checkout.Session.create(
-                    payment_method_types=["card"],
+                    payment_method_types=["card", "wechat_pay"],
                     line_items=[{
                         "price_data": {
                             "currency": "usd",
@@ -1088,6 +1094,9 @@ def purchase_dialog():
                         "quantity": 1,
                     }],
                     mode="payment",
+                    payment_method_options={
+                        "wechat_pay": {"client": "web"}
+                    },
                     success_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/?order_success=1&plan=1200",
                     cancel_url="https://appuct-feasibility-ktqejrpgsdbxwfjbcsorqq.streamlit.app/",
                     customer_creation="always",
@@ -1098,8 +1107,8 @@ def purchase_dialog():
             except Exception as e:
                 st.error(f"创建支付会话失败: {e}" if lang=="zh" else f"Failed to create checkout session: {e}")
     
-    st.markdown("#### 🇨🇳 国内支付（支付宝/微信）" if lang=="zh" else "#### 🇨🇳 Domestic Payment (Alipay/WeChat Pay)")
-    st.info("支持信用卡支付。支付宝和微信支付即将开放。" if lang=="zh" else "Credit card payments are supported. Alipay and WeChat Pay coming soon.")
+    st.markdown("#### 🇨🇳 国内支付（微信）" if lang=="zh" else "#### 🇨🇳 Domestic Payment (WeChat Pay)")
+    st.info("支持信用卡和微信支付。支付宝即将开放。" if lang=="zh" else "Supports credit cards and WeChat Pay. Alipay coming soon.")
     st.markdown("支付成功后会自动跳回本页面，授权码将自动激活。" if lang=="zh" else "You will be redirected back after payment, and the license key will be auto-activated.")
 
 # ================== 侧边栏 ==================
