@@ -1142,8 +1142,27 @@ def purchase_dialog():
     st.info("支持信用卡、微信支付和支付宝。" if lang=="zh" else "Supports credit cards, WeChat Pay and Alipay.")
     st.markdown("支付成功后会自动跳回本页面，授权码将自动激活。" if lang=="zh" else "You will be redirected back after payment, and the license key will be auto-activated.")
 
-# ================== 侧边栏 ==================
+# ================== 侧边栏（已调整顺序） ==================
 with st.sidebar:
+    # ========== 1. 关于分析系统部分（最上方） ==========
+    st.markdown(f"## {t['sidebar_title']}")
+    st.markdown(t["sidebar_basis"])
+    for item in t["basis_items"]:
+        st.markdown(f"- {item}")
+    st.markdown("---")
+    
+    # ========== 2. 分析人姓名和头衔 ==========
+    analyst_name = st.text_input(t["analyst_name_label"], placeholder=t["analyst_name_ph"])
+    analyst_title = st.text_input(t["analyst_title_label"], placeholder=t["analyst_title_ph"])
+    if analyst_name:
+        st.markdown(f"**{t['analyst_name_label']}: {analyst_name}**")
+        if analyst_title:
+            st.markdown(f"_{analyst_title}_")
+    else:
+        st.caption(t["analyst_name_ph"])
+    st.markdown("---")
+    
+    # ========== 3. 授权码输入与状态显示 ==========
     report_key_input = st.text_input(
         t["report_key_label"],
         value=st.session_state.current_report_key,
@@ -1174,30 +1193,22 @@ with st.sidebar:
         if expiry_str != "试用剩余次数" and expiry_str != "Trial left":
             st.write(f"{t['expiry_label']}: {expiry_str}")
     st.markdown("---")
+    
+    # ========== 4. 购买按钮 ==========
     st.markdown(f"## {t['purchase_title']}")
     if st.button(t["purchase_button"], use_container_width=True):
         purchase_dialog()
     st.markdown("---")
-    st.markdown(f"## {t['sidebar_title']}")
-    st.markdown(t["sidebar_basis"])
-    for item in t["basis_items"]:
-        st.markdown(f"- {item}")
-    st.markdown("---")
-    analyst_name = st.text_input(t["analyst_name_label"], placeholder=t["analyst_name_ph"])
-    analyst_title = st.text_input(t["analyst_title_label"], placeholder=t["analyst_title_ph"])
-    if analyst_name:
-        st.markdown(f"**{t['analyst_name_label']}: {analyst_name}**")
-        if analyst_title:
-            st.markdown(f"_{analyst_title}_")
-    else:
-        st.caption(t["analyst_name_ph"])
-    st.markdown("---")
+    
+    # ========== 5. API状态 ==========
     st.markdown(f"**{t['api_status']}**")
     if st.session_state.ai_api_key:
         st.success(t["api_configured"])
     else:
         st.error(t["api_not_configured"])
     st.markdown("---")
+    
+    # ========== 6. 联系信息 ==========
     st.markdown(t["contact_info"])
 
 # ================== 主表单 ==================
