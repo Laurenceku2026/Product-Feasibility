@@ -1,4 +1,15 @@
 import streamlit as st
+import streamlit.components.v1 as components
+
+# 自动跳转到 TechLife 门户
+components.html("""
+    <meta http-equiv="refresh" content="0; url=https://techlife-app.streamlit.app/">
+""", height=0)
+
+# 下面的代码可以全部删除或保留（用户已经看不到了）
+
+
+import streamlit as st
 import openai
 import json
 import os
