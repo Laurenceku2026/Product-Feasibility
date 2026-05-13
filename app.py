@@ -1,12 +1,18 @@
 import streamlit as st
-import streamlit.components.v1 as components
 
-# 自动跳转到 TechLife 门户
-components.html("""
+# 使用 st.markdown 注入 meta 刷新标签
+st.markdown(
+    """
     <meta http-equiv="refresh" content="0; url=https://techlife-app.streamlit.app/">
-""", height=0)
+    """,
+    unsafe_allow_html=True
+)
 
-# 下面的代码可以全部删除或保留（用户已经看不到了）
+# 显示一条短暂提示（可选）
+st.info("正在跳转至 TechLife 门户，请稍候...")
+
+# 立即停止执行后续所有代码，确保重定向优先
+st.stop()
 
 
 import streamlit as st
