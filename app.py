@@ -1,17 +1,24 @@
 import streamlit as st
 
-# 使用 st.markdown 注入 meta 刷新标签
-st.markdown(
-    """
-    <meta http-equiv="refresh" content="0; url=https://techlife-app.streamlit.app/">
-    """,
-    unsafe_allow_html=True
-)
+st.set_page_config(page_title="工具已迁移", page_icon="🚀")
 
-# 显示一条短暂提示（可选）
-st.info("正在跳转至 TechLife 门户，请稍候...")
+st.title("📢 工具已迁移")
 
-# 立即停止执行后续所有代码，确保重定向优先
+st.markdown("""
+## 此工具已整合至 TechLife 门户
+
+请点击下方链接访问新版工具：
+
+👉 [**打开 TechLife 门户**](https://techlife-app.streamlit.app/)
+
+---
+
+*您将不会自动跳转，请手动点击上方链接。*
+""")
+
+# 可选：显示一个大的按钮
+st.link_button("🚀 前往 TechLife 门户", "https://app.techlife-suite.com", use_container_width=True)
+
 st.stop()
 
 
